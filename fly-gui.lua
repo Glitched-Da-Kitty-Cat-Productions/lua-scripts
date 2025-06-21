@@ -50,7 +50,7 @@ TitleLabel.Name = "TitleLabel"
 local CloseButton = Instance.new("TextButton")
 CloseButton.Parent = Frame
 CloseButton.Size = UDim2.new(0, 30, 0, 25)
-CloseButton.Position = UDim2.new(1, -35, 0, 0)
+CloseButton.Position = UDim2.new(1, -35, 1, -35)
 CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 CloseButton.Font = Enum.Font.GothamBold
 CloseButton.Text = "X"
@@ -68,6 +68,28 @@ FlyToggleButton.Text = "Fly: OFF"
 FlyToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 FlyToggleButton.TextScaled = true
 FlyToggleButton.Name = "FlyToggleButton"
+
+local NoClipButton = Instance.new("TextButton")
+NoClipButton.Parent = Frame
+NoClipButton.Size = UDim2.new(0, 80, 0, 30)
+NoClipButton.Position = UDim2.new(0, 100, 0, 35)
+NoClipButton.BackgroundColor3 = Color3.fromRGB(120, 0, 120)
+NoClipButton.Font = Enum.Font.GothamBold
+NoClipButton.Text = "NoClip: OFF"
+NoClipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoClipButton.TextScaled = true
+NoClipButton.Name = "NoClipButton"
+
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Parent = Frame
+MinimizeButton.Size = UDim2.new(0, 30, 0, 25)
+MinimizeButton.Position = UDim2.new(1, -70, 1, -35)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.Text = "-"
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextScaled = true
+MinimizeButton.Name = "MinimizeButton"
 
 local SpeedLabel = Instance.new("TextLabel")
 SpeedLabel.Parent = Frame
@@ -115,6 +137,9 @@ SpeedDownButton.Name = "SpeedDownButton"
 
 local flying = false
 local flySpeed = 1
+local noclip = false
+local changingstate = false
+local statechosen = nil
 
 local CONTROL = {F = 0, B = 0, L = 0, R = 0}
 local lCONTROL = {F = 0, B = 0, L = 0, R = 0}
@@ -166,6 +191,22 @@ local function fly()
     end)
 end
 
+RunService.Stepped:Connect(function()
+    if noclip then
+        if player.Character.Humanoid.RigType == Enum.HumanoidRigType.R6 then
+            player.Character.Head.CanCollide = false
+            player.Character.Torso.CanCollide = false
+            player.Character["Left Leg"].CanCollide = false
+            player.Character["Right Leg"].CanCollide = false
+        else
+            player.Character.Humanoid:ChangeState(11)
+        end
+    end
+    if changingstate then
+        player.Character.Humanoid:ChangeState(statechosen)
+    end
+end)
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.Keyboard then
@@ -209,6 +250,15 @@ FlyToggleButton.MouseButton1Click:Connect(function()
     else
         fly()
         FlyToggleButton.Text = "Fly: ON"
+    end
+end)
+
+NoClipButton.MouseButton1Click:Connect(function()
+    noclip = not noclip
+    if noclip then
+        NoClipButton.Text = "NoClip: ON"
+    else
+        NoClipButton.Text = "NoClip: OFF"
     end
 end)
 
