@@ -10,10 +10,10 @@ main.ResetOnSpawn = false
 
 local Frame = Instance.new("Frame")
 Frame.Parent = main
-Frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-Frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 0, 50)
+Frame.BorderColor3 = Color3.fromRGB(80, 0, 120)
 Frame.Position = UDim2.new(0.1, 0, 0.4, 0)
-Frame.Size = UDim2.new(0, 220, 0, 80)
+Frame.Size = UDim2.new(0, 280, 0, 120)
 Frame.Active = true
 Frame.Draggable = true
 Frame.ClipsDescendants = true
