@@ -10,14 +10,31 @@ main.ResetOnSpawn = false
 
 local Frame = Instance.new("Frame")
 Frame.Parent = main
-Frame.BackgroundColor3 = Color3.fromRGB(30, 0, 50)
-Frame.BorderColor3 = Color3.fromRGB(80, 0, 120)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 0, 40)
+Frame.BorderColor3 = Color3.fromRGB(100, 0, 150)
 Frame.Position = UDim2.new(0.1, 0, 0.4, 0)
-Frame.Size = UDim2.new(0, 280, 0, 120)
+Frame.Size = UDim2.new(0, 320, 0, 160)
 Frame.Active = true
 Frame.Draggable = true
 Frame.ClipsDescendants = true
 Frame.Name = "MainFrame"
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 15)
+UICorner.Parent = Frame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(180, 0, 255)
+UIStroke.Thickness = 2
+UIStroke.Parent = Frame
+
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 0, 150)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 0, 40))
+}
+UIGradient.Rotation = 45
+UIGradient.Parent = Frame
 
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Parent = Frame
