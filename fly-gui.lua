@@ -99,11 +99,12 @@ SpeedDownButton.Name = "SpeedDownButton"
 local flying = false
 local flySpeed = 1
 
-local function updateSpeedDisplay()
-    SpeedValue.Text = tostring(flySpeed)
-end
+local CONTROL = {F = 0, B = 0, L = 0, R = 0}
+local lCONTROL = {F = 0, B = 0, L = 0, R = 0}
+local SPEED = 0
 
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local player = LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
@@ -112,48 +113,76 @@ local rootPart = character:WaitForChild("HumanoidRootPart")
 local bodyGyro
 local bodyVelocity
 
-local function startFly()
-    if flying then return end
+local function fly()
     flying = true
-
-    bodyGyro = Instance.new("BodyGyro", rootPart)
+    bodyGyro = Instance.new('BodyGyro', rootPart)
+    bodyVelocity = Instance.new('BodyVelocity', rootPart)
     bodyGyro.P = 9e4
     bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
     bodyGyro.cframe = rootPart.CFrame
-
-    bodyVelocity = Instance.new("BodyVelocity", rootPart)
-    bodyVelocity.velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.velocity = Vector3.new(0, 0.1, 0)
     bodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
-
-    humanoid.PlatformStand = true
-
-    local connection
-    connection = RunService.Heartbeat:Connect(function()
-        local moveDirection = humanoid.MoveDirection
-        if moveDirection.Magnitude > 0 then
-            bodyVelocity.velocity = moveDirection * flySpeed * 50
-            bodyGyro.cframe = workspace.CurrentCamera.CFrame
-        else
-            bodyVelocity.velocity = Vector3.new(0, 0, 0)
-        end
-    end)
-
-    FlyToggleButton:GetPropertyChangedSignal("Text"):Connect(function()
-        if not flying then
-            connection:Disconnect()
-            if bodyGyro then bodyGyro:Destroy() end
-            if bodyVelocity then bodyVelocity:Destroy() end
-            humanoid.PlatformStand = false
-        end
+    spawn(function()
+        repeat wait()
+            humanoid.PlatformStand = true
+            if CONTROL.L + CONTROL.R ~= 0 or CONTROL.F + CONTROL.B ~= 0 then
+                SPEED = 50
+            elseif not (CONTROL.L + CONTROL.R ~= 0 or CONTROL.F + CONTROL.B ~= 0) and SPEED ~= 0 then
+                SPEED = 0
+            end
+            if (CONTROL.L + CONTROL.R) ~= 0 or (CONTROL.F + CONTROL.B) ~= 0 then
+                bodyVelocity.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (CONTROL.F + CONTROL.B)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(CONTROL.L + CONTROL.R, (CONTROL.F + CONTROL.B) * 0.2, 0).p) - workspace.CurrentCamera.CoordinateFrame.p)) * SPEED
+                lCONTROL = {F = CONTROL.F, B = CONTROL.B, L = CONTROL.L, R = CONTROL.R}
+            elseif (CONTROL.L + CONTROL.R) == 0 and (CONTROL.F + CONTROL.B) == 0 and SPEED ~= 0 then
+                bodyVelocity.velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (lCONTROL.F + lCONTROL.B)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(lCONTROL.L + lCONTROL.R, (lCONTROL.F + lCONTROL.B) * 0.2, 0).p) - workspace.CurrentCamera.CoordinateFrame.p)) * SPEED
+            else
+                bodyVelocity.velocity = Vector3.new(0, 0.1, 0)
+            end
+            bodyGyro.cframe = workspace.CurrentCamera.CoordinateFrame
+        until not flying
+        CONTROL = {F = 0, B = 0, L = 0, R = 0}
+        lCONTROL = {F = 0, B = 0, L = 0, R = 0}
+        SPEED = 0
+        bodyGyro:Destroy()
+        bodyVelocity:Destroy()
+        humanoid.PlatformStand = false
     end)
 end
 
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local key = input.KeyCode
+        if key == Enum.KeyCode.W then
+            CONTROL.F = flySpeed
+        elseif key == Enum.KeyCode.S then
+            CONTROL.B = -flySpeed
+        elseif key == Enum.KeyCode.A then
+            CONTROL.L = -flySpeed
+        elseif key == Enum.KeyCode.D then
+            CONTROL.R = flySpeed
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local key = input.KeyCode
+        if key == Enum.KeyCode.W then
+            CONTROL.F = 0
+        elseif key == Enum.KeyCode.S then
+            CONTROL.B = 0
+        elseif key == Enum.KeyCode.A then
+            CONTROL.L = 0
+        elseif key == Enum.KeyCode.D then
+            CONTROL.R = 0
+        end
+    end
+end)
+
 local function stopFly()
-    if not flying then return end
     flying = false
-    if bodyGyro then bodyGyro:Destroy() end
-    if bodyVelocity then bodyVelocity:Destroy() end
-    humanoid.PlatformStand = false
 end
 
 FlyToggleButton.MouseButton1Click:Connect(function()
@@ -161,20 +190,20 @@ FlyToggleButton.MouseButton1Click:Connect(function()
         stopFly()
         FlyToggleButton.Text = "Fly: OFF"
     else
-        startFly()
+        fly()
         FlyToggleButton.Text = "Fly: ON"
     end
 end)
 
 SpeedUpButton.MouseButton1Click:Connect(function()
     flySpeed = flySpeed + 1
-    updateSpeedDisplay()
+    SpeedValue.Text = tostring(flySpeed)
 end)
 
 SpeedDownButton.MouseButton1Click:Connect(function()
     if flySpeed > 1 then
         flySpeed = flySpeed - 1
-        updateSpeedDisplay()
+        SpeedValue.Text = tostring(flySpeed)
     end
 end)
 
