@@ -1,3 +1,4 @@
+-- Owner of this script is this discord (https://discord.gg/nx2ZJEpnU4)
 if not game then
     error("This script must be run in a Roblox environment.")
 end
