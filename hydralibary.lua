@@ -3264,6 +3264,32 @@ function UILibrary.new(gameName, userId, rank)
 
     local Drag = Draggable.Drag(window.MainUI, Frame)
 
+    --// Add close button to main UI
+    local CloseButton = Instance.new("ImageButton")
+    CloseButton.Name = "CloseButton"
+    CloseButton.Size = UDim2.new(0, 30, 0, 30)
+    CloseButton.Position = UDim2.new(1, -35, 0, 5)
+    CloseButton.AnchorPoint = Vector2.new(1, 0)
+    CloseButton.BackgroundTransparency = 1
+    CloseButton.Image = "rbxassetid://7072725342" -- Using existing close icon
+    CloseButton.Parent = window.MainUI
+
+    --// Close button click hides the main UI
+    CloseButton.MouseButton1Click:Connect(function()
+        window.Parent.Enabled = false
+    end)
+
+    --// Add keybind to toggle UI visibility (default to RightControl)
+    local UserInputService = game:GetService("UserInputService")
+    local toggleKey = Enum.KeyCode.RightControl
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == toggleKey then
+            window.Parent.Enabled = not window.Parent.Enabled
+        end
+    end)
+
     --// Customize the GUI
     window.Watermark.Text = ("hydrahub v2 | %s | %s"):format(userId, gameName)
     local userinfo = window.MainUI.Sidebar.ContentHolder.UserInfo.Content
