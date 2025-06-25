@@ -1,3 +1,4 @@
+-- No Clue Who Made This But It Works I also Improved it alittle ( if your the owner of this script contact me at glitched-da-kitty-cat.is-a.dev/contact so i can put your name here )
 local Services = setmetatable({}, {__index = function(Self, Index)
 local NewService = game.GetService(game, Index)
 if NewService then
