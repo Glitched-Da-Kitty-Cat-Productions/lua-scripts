@@ -1,0 +1,1 @@
+# Before people call me a skid or stupid shit like that I am only uploading scripts that I know aren't malware because i don't trust people to not change there mind and put malware in there scripts so its a safer way for me to make load strings
