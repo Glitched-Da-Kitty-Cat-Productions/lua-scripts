@@ -1,3 +1,5 @@
+-- No Clue Who Made This But It Works ( if your the owner of this script contact me at glitched-da-kitty-cat.is-a.dev/contact so i can put your name here )
+
 local passes, fails, undefined = 0, 0, 0
 local running = 0
 
