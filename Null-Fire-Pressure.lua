@@ -1,3 +1,4 @@
+-- Owned By github.com/InfernusScripts/ just uploaded incase they decide to delete the scripts
 local defaults = {
 	AntiEyefestation = false,
 	AntiSquid = false,
