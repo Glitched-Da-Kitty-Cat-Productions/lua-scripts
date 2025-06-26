@@ -1,3 +1,4 @@
+-- Owned By github.com/InfernusScripts/ just uploaded incase they decide to delete the scripts
 local defaults = {
 	flex = false,
 	delay = 0,
