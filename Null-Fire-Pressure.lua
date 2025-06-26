@@ -83,10 +83,6 @@ local function getGlobalTable()
 	return typeof(getfenv().getgenv) == "function" and typeof(getfenv().getgenv()) == "table" and getfenv().getgenv() or _G
 end
 
-if game.PlaceId == 12411473842 then
-	return loadstring(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Null-Fire/refs/heads/main/Core/Loaders/Pressure-Lobby/Main.lua"))()
-end
-
 local closed = false
 local blocked = {}
 local cons = {}
