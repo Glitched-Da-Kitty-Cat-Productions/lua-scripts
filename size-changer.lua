@@ -1,11 +1,17 @@
 
--- Advanced Size Changer GUI for Roblox
--- Works with both R6 and R15 characters
+-- Modern Size Changer GUI using CFrame manipulation
+-- More reliable method that works around Roblox restrictions
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+
+-- Global variables
+local currentScale = 1
+local originalSizes = {}
+local originalCFrames = {}
+local isScaling = false
 
 -- Create GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -49,7 +55,7 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 0)
 TitleLabel.Size = UDim2.new(1, 0, 0, 40)
 TitleLabel.Font = Enum.Font.SourceSansBold
-TitleLabel.Text = "Size Changer"
+TitleLabel.Text = "Advanced Size Changer"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 18
 
@@ -147,127 +153,159 @@ StatusLabel.BackgroundTransparency = 1
 StatusLabel.Position = UDim2.new(0, 0, 0.85, 0)
 StatusLabel.Size = UDim2.new(1, 0, 0, 25)
 StatusLabel.Font = Enum.Font.SourceSans
-StatusLabel.Text = "Ready to change size"
+StatusLabel.Text = "Ready - New CFrame method loaded"
 StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 StatusLabel.TextSize = 12
 
--- Size Change Function
-local function changeCharacterSize(scale)
+-- Store original data function
+local function storeOriginalData(character)
+    if not character then return end
+    
+    originalSizes = {}
+    originalCFrames = {}
+    
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            originalSizes[part] = part.Size
+            originalCFrames[part] = part.CFrame
+            
+            -- Store mesh data
+            for _, mesh in pairs(part:GetChildren()) do
+                if mesh:IsA("SpecialMesh") then
+                    originalSizes[mesh] = mesh.Scale
+                end
+            end
+        elseif part:IsA("Accessory") and part:FindFirstChild("Handle") then
+            local handle = part.Handle
+            originalSizes[handle] = handle.Size
+            originalCFrames[handle] = handle.CFrame
+            
+            for _, mesh in pairs(handle:GetChildren()) do
+                if mesh:IsA("SpecialMesh") then
+                    originalSizes[mesh] = mesh.Scale
+                end
+            end
+        end
+    end
+end
+
+-- New CFrame-based scaling method
+local function changeCharacterSizeAdvanced(scale)
     local character = LocalPlayer.Character
     if not character then
-        StatusLabel.Text = "Error: Character not found!"
+        StatusLabel.Text = "Error: No character found!"
         StatusLabel.TextColor3 = Color3.fromRGB(244, 67, 54)
         return false
     end
     
     local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then
-        StatusLabel.Text = "Error: Humanoid not found!"
-        StatusLabel.TextColor3 = Color3.fromRGB(244, 67, 54)
-        return false
-    end
-    
     local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then
-        StatusLabel.Text = "Error: HumanoidRootPart not found!"
+    
+    if not humanoid or not rootPart then
+        StatusLabel.Text = "Error: Character not ready!"
         StatusLabel.TextColor3 = Color3.fromRGB(244, 67, 54)
         return false
     end
     
-    local success = false
+    -- Store original data if first time
+    if next(originalSizes) == nil then
+        storeOriginalData(character)
+    end
     
-    -- Try R15 scaling first
-    if humanoid.RigType == Enum.HumanoidRigType.R15 then
-        local scaleSuccess = pcall(function()
-            -- Check if scale properties exist before using them
+    currentScale = scale
+    isScaling = true
+    
+    pcall(function()
+        -- Method 1: Try R15 first
+        if humanoid.RigType == Enum.HumanoidRigType.R15 then
             if humanoid:FindFirstChild("DepthScale") then
                 humanoid.DepthScale.Value = scale
             end
-            if humanoid:FindFirstChild("HeightScale") then  
+            if humanoid:FindFirstChild("HeightScale") then
                 humanoid.HeightScale.Value = scale
             end
             if humanoid:FindFirstChild("WidthScale") then
                 humanoid.WidthScale.Value = scale
             end
-        end)
-        
-        if scaleSuccess then
-            success = true
-            StatusLabel.Text = "R15 size changed to " .. tostring(scale) .. "x!"
-            StatusLabel.TextColor3 = Color3.fromRGB(76, 175, 80)
         end
-    end
-    
-    -- If R15 failed or it's R6, try manual scaling
-    if not success then
-        local manualSuccess = pcall(function()
-            -- Scale body parts with original size tracking
-            for _, part in pairs(character:GetChildren()) do
-                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                    -- Store original size if not already stored
-                    local originalSize = part:GetAttribute("OriginalSize")
-                    if not originalSize then
-                        part:SetAttribute("OriginalSize", part.Size)
-                        originalSize = part.Size
+        
+        -- Method 2: Manual scaling with CFrame preservation
+        local rootPosition = rootPart.CFrame
+        
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") and originalSizes[part] then
+                -- Calculate new size
+                local newSize = originalSizes[part] * scale
+                part.Size = newSize
+                
+                -- Preserve relative position using CFrame
+                if part ~= rootPart and originalCFrames[part] then
+                    local relativePos = rootPart.CFrame:ToObjectSpace(originalCFrames[part])
+                    part.CFrame = rootPart.CFrame:ToWorldSpace(relativePos)
+                end
+                
+                -- Scale meshes
+                for _, mesh in pairs(part:GetChildren()) do
+                    if mesh:IsA("SpecialMesh") and originalSizes[mesh] then
+                        mesh.Scale = originalSizes[mesh] * scale
                     end
-                    part.Size = originalSize * scale
+                end
+            end
+        end
+        
+        -- Scale accessories
+        for _, accessory in pairs(character:GetChildren()) do
+            if accessory:IsA("Accessory") then
+                local handle = accessory:FindFirstChild("Handle")
+                if handle and originalSizes[handle] then
+                    handle.Size = originalSizes[handle] * scale
                     
-                    -- Scale meshes with original scale tracking
-                    for _, mesh in pairs(part:GetChildren()) do
-                        if mesh:IsA("SpecialMesh") then
-                            local originalScale = mesh:GetAttribute("OriginalScale")
-                            if not originalScale then
-                                mesh:SetAttribute("OriginalScale", mesh.Scale)
-                                originalScale = mesh.Scale
-                            end
-                            mesh.Scale = originalScale * scale
+                    -- Scale accessory meshes
+                    for _, mesh in pairs(handle:GetChildren()) do
+                        if mesh:IsA("SpecialMesh") and originalSizes[mesh] then
+                            mesh.Scale = originalSizes[mesh] * scale
                         end
                     end
                 end
             end
-            
-            -- Scale accessories with original size tracking
-            for _, accessory in pairs(character:GetChildren()) do
-                if accessory:IsA("Accessory") then
-                    local handle = accessory:FindFirstChild("Handle")
-                    if handle then
-                        local originalSize = handle:GetAttribute("OriginalSize")
-                        if not originalSize then
-                            handle:SetAttribute("OriginalSize", handle.Size)
-                            originalSize = handle.Size
-                        end
-                        handle.Size = originalSize * scale
-                        
-                        -- Scale accessory meshes
-                        for _, mesh in pairs(handle:GetChildren()) do
-                            if mesh:IsA("SpecialMesh") then
-                                local originalScale = mesh:GetAttribute("OriginalScale")
-                                if not originalScale then
-                                    mesh:SetAttribute("OriginalScale", mesh.Scale)
-                                    originalScale = mesh.Scale
-                                end
-                                mesh.Scale = originalScale * scale
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-        
-        if manualSuccess then
-            success = true
-            StatusLabel.Text = "Manual size changed to " .. tostring(scale) .. "x!"
-            StatusLabel.TextColor3 = Color3.fromRGB(76, 175, 80)
         end
-    end
+        
+        -- Force position update
+        rootPart.CFrame = rootPosition
+    end)
     
-    if not success then
-        StatusLabel.Text = "Error: Failed to change size!"
-        StatusLabel.TextColor3 = Color3.fromRGB(244, 67, 54)
-        return false
-    end
+    StatusLabel.Text = "Size changed to " .. tostring(scale) .. "x (CFrame method)!"
+    StatusLabel.TextColor3 = Color3.fromRGB(76, 175, 80)
     
     return true
+end
+
+-- Continuous update function to maintain size
+local connection
+local function startSizeMonitor()
+    if connection then connection:Disconnect() end
+    
+    connection = RunService.Heartbeat:Connect(function()
+        if isScaling and LocalPlayer.Character and currentScale ~= 1 then
+            local character = LocalPlayer.Character
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            
+            if humanoid and humanoid.RigType == Enum.HumanoidRigType.R15 then
+                -- Continuously apply R15 scaling
+                pcall(function()
+                    if humanoid:FindFirstChild("DepthScale") and humanoid.DepthScale.Value ~= currentScale then
+                        humanoid.DepthScale.Value = currentScale
+                    end
+                    if humanoid:FindFirstChild("HeightScale") and humanoid.HeightScale.Value ~= currentScale then
+                        humanoid.HeightScale.Value = currentScale
+                    end
+                    if humanoid:FindFirstChild("WidthScale") and humanoid.WidthScale.Value ~= currentScale then
+                        humanoid.WidthScale.Value = currentScale
+                    end
+                end)
+            end
+        end
+    end)
 end
 
 -- Button Events
@@ -287,28 +325,27 @@ ApplyButton.MouseButton1Click:Connect(function()
         return
     end
     
-    changeCharacterSize(size)
+    changeCharacterSizeAdvanced(size)
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
+    if connection then connection:Disconnect() end
     ScreenGui:Destroy()
-end)
-
--- Keyboard shortcut (Ctrl + K to toggle GUI)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.K and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-        if ScreenGui.Parent then
-            ScreenGui:Destroy()
-        end
-    end
 end)
 
 -- Auto-reset on character spawn
 LocalPlayer.CharacterAdded:Connect(function()
+    wait(2) -- Wait for character to fully load
+    originalSizes = {}
+    originalCFrames = {}
+    currentScale = 1
+    isScaling = false
     StatusLabel.Text = "Character respawned - Ready!"
     StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 end)
 
-print("Size Changer GUI loaded! Use Ctrl+K to close.")
+-- Start the size monitor
+startSizeMonitor()
+
+print("Advanced Size Changer GUI loaded with CFrame method!")
+print("This uses a different approach that should be more reliable.")
