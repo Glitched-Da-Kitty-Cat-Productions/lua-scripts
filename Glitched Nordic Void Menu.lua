@@ -100,9 +100,9 @@ SafetySection:AddButton({
     --Default = false,
     --Callback = function(value)
         ---if value then
-            
+
 --        else
-            
+
 --        end
     --end
 --})
@@ -110,7 +110,77 @@ SafetySection:AddButton({
 
 -- Tools Tab Section
 local ToolsSection = ToolsTab:AddSection({Name = "Tools", Position = "left"})
-ToolsSection:AddButton({
+
+-- Load Player ESP module
+local PlayerESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/Glitched-Da-Kitty-Cat-Productions/lua-scripts/refs/heads/main/plaer-esp.lua"))()
+
+-- Player ESP Section
+local PlayerESPSection = ToolsTab:AddSection({Name = "Player ESP", Position = "left"})
+
+PlayerESPSection:AddToggle({
+    Name = "Enable Player ESP",
+    Default = false,
+    Callback = function(value)
+        if value then
+            PlayerESP:Init()
+            PlayerESP:Toggle(true)
+        else
+            PlayerESP:Toggle(false)
+        end
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Team Check",
+    Default = false,
+    Callback = function(value)
+        PlayerESP.TeamCheck = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Show Names",
+    Default = true,
+    Callback = function(value)
+        PlayerESP.ShowName = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Show Health",
+    Default = true,
+    Callback = function(value)
+        PlayerESP.ShowHealth = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Show Distance",
+    Default = true,
+    Callback = function(value)
+        PlayerESP.ShowDistance = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Box ESP",
+    Default = true,
+    Callback = function(value)
+        PlayerESP.BoxESP = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Tracer ESP",
+    Default = false,
+    Callback = function(value)
+        PlayerESP.TracerESP = value
+    end
+})
+
+-- Other Tools Section
+local OtherToolsSection = ToolsTab:AddSection({Name = "Other Tools", Position = "left"})
+OtherToolsSection:AddButton({
     Name = "Touch Fling Tool",
     Callback = function()
         local success, err = pcall(function()
@@ -118,6 +188,17 @@ ToolsSection:AddButton({
         end)
         if not success then
             warn("Failed to execute Touch Fling: " .. tostring(err))
+        end
+    end
+})
+OtherToolsSection:AddButton({
+    Name = "Aimbot",
+    Callback = function()
+        local success, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Glitched-Da-Kitty-Cat-Productions/lua-scripts/refs/heads/main/aimbot.lua"))()
+        end)
+        if not success then
+            warn("Failed to execute Aimbot: " .. tostring(err))
         end
     end
 })
@@ -202,9 +283,9 @@ PlayerSections:AddLabel("Some Of These Scripts Reset On Player Death")
 PlayerSections:AddSlider({
     Name = "Walk Speed",
     Min = 16,
-	Max = 1000,
-	Round = 0,
-	Default = 16,
+    Max = 1000,
+    Round = 0,
+    Default = 16,
     Callback = function(Value)
         local Players = game:GetService("Players")
         local Player = Players.LocalPlayer
@@ -214,9 +295,9 @@ PlayerSections:AddSlider({
 PlayerSections:AddSlider({
     Name = "Jump Power",
     Min = 50,
-	Max = 1000,
-	Round = 0,
-	Default = 50,
+    Max = 1000,
+    Round = 0,
+    Default = 50,
     Callback = function(Value)
         local Players = game:GetService("Players")
         local Player = Players.LocalPlayer
@@ -226,9 +307,9 @@ PlayerSections:AddSlider({
 PlayerSections:AddSlider({
     Name = "Hip Height",
     Min = 2,
-	Max = 100,
-	Round = 0,
-	Default = 2,
+    Max = 100,
+    Round = 0,
+    Default = 2,
     Callback = function(Value)
         local Players = game:GetService("Players")
         local Player = Players.LocalPlayer
@@ -311,7 +392,7 @@ PlayerSections:AddToggle({
 
         if Value then
             enableGodMode()
-            
+
         else
             disableGodMode()
         end
@@ -319,7 +400,7 @@ PlayerSections:AddToggle({
 })
 
 PlayerSections:AddToggle({
-    Name = "Keep Inventory On Death (NW)",
+    Name = "Keep Inventory On Death",
     Default = false,
     Callback = function(Value)
         local Players = game:GetService("Players")
@@ -327,32 +408,42 @@ PlayerSections:AddToggle({
         local inventoryBackup = {}
         local deathConnection = nil
         local characterConnection = nil
+        local backpackConnection = nil
 
         local function backupInventory()
             inventoryBackup = {}
             local backpack = LocalPlayer:FindFirstChild("Backpack")
+            local character = LocalPlayer.Character
+            
+            -- Backup tools in backpack
             if backpack then
                 for _, item in pairs(backpack:GetChildren()) do
                     if item:IsA("Tool") then
-                        table.insert(inventoryBackup, item:Clone())
+                        local clonedTool = item:Clone()
+                        table.insert(inventoryBackup, clonedTool)
                     end
+                end
+            end
+            
+            -- Backup equipped tool
+            if character then
+                local equippedTool = character:FindFirstChildOfClass("Tool")
+                if equippedTool then
+                    local clonedTool = equippedTool:Clone()
+                    table.insert(inventoryBackup, clonedTool)
                 end
             end
         end
 
         local function restoreInventory()
+            task.wait(0.5) -- Wait for character to fully load
             local backpack = LocalPlayer:FindFirstChild("Backpack")
-            if backpack then
-                -- Remove all existing tools to prevent duplicates
-                for _, existingItem in pairs(backpack:GetChildren()) do
-                    if existingItem:IsA("Tool") then
-                        existingItem:Destroy()
-                    end
-                end
-                -- Restore backup items by cloning to avoid issues
+            if backpack and #inventoryBackup > 0 then
                 for _, item in pairs(inventoryBackup) do
-                    local clone = item:Clone()
-                    clone.Parent = backpack
+                    if item and item:IsA("Tool") then
+                        local newTool = item:Clone()
+                        newTool.Parent = backpack
+                    end
                 end
             end
         end
@@ -362,16 +453,33 @@ PlayerSections:AddToggle({
                 deathConnection:Disconnect()
                 deathConnection = nil
             end
+            
+            -- Wait for character to fully load before backing up
+            task.wait(1)
             backupInventory()
-            deathConnection = char:WaitForChild("Humanoid").Died:Connect(function()
-                task.wait(2) 
+            
+            local humanoid = char:WaitForChild("Humanoid")
+            deathConnection = humanoid.Died:Connect(function()
+                -- Restore inventory when new character spawns
+                LocalPlayer.CharacterAdded:Wait()
                 restoreInventory()
+            end)
+            
+            -- Update backup when tools are added/removed
+            if backpackConnection then
+                backpackConnection:Disconnect()
+            end
+            local backpack = LocalPlayer:WaitForChild("Backpack")
+            backpackConnection = backpack.ChildAdded:Connect(function()
+                task.wait(0.1)
+                backupInventory()
             end)
         end
 
         if Value then
-            backupInventory()
-            onCharacterAdded(LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait())
+            if LocalPlayer.Character then
+                onCharacterAdded(LocalPlayer.Character)
+            end
             characterConnection = LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
         else
             if deathConnection then
@@ -381,6 +489,10 @@ PlayerSections:AddToggle({
             if characterConnection then
                 characterConnection:Disconnect()
                 characterConnection = nil
+            end
+            if backpackConnection then
+                backpackConnection:Disconnect()
+                backpackConnection = nil
             end
             inventoryBackup = {}
         end
