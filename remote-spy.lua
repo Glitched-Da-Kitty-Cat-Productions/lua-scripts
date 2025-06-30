@@ -1,12 +1,15 @@
 
--- Remote Spy Script (Fixed Version)
--- Logs all RemoteEvent and RemoteFunction calls using proper hooking
+-- Advanced Remote Spy Script
+-- Logs RemoteEvents, RemoteFunctions, user clicks, movement, chat, and more
 
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- Configuration
-local maxLogs = 1000
+local maxLogs = 500
 local logs = {}
 local isLogging = true
 local logCount = 0
@@ -18,17 +21,29 @@ local Title = Instance.new("TextLabel")
 local LogFrame = Instance.new("ScrollingFrame")
 local ClearButton = Instance.new("TextButton")
 local ToggleButton = Instance.new("TextButton")
-local ExportButton = Instance.new("TextButton")
+local FilterFrame = Instance.new("Frame")
+local FilterTitle = Instance.new("TextLabel")
+local ChatToggle = Instance.new("TextButton")
+local ClickToggle = Instance.new("TextButton")
+local MovementToggle = Instance.new("TextButton")
+local RemoteToggle = Instance.new("TextButton")
 
-ScreenGui.Name = "RemoteSpy"
+-- Tracking states
+local trackChat = true
+local trackClicks = true
+local trackMovement = true
+local trackRemotes = true
+
+ScreenGui.Name = "AdvancedRemoteSpy"
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 ScreenGui.ResetOnSpawn = false
 
+-- Main Frame
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
-MainFrame.Size = UDim2.new(0, 600, 0, 400)
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.Size = UDim2.new(0, 700, 0, 500)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -36,20 +51,68 @@ local MainCorner = Instance.new("UICorner")
 MainCorner.CornerRadius = UDim.new(0, 8)
 MainCorner.Parent = MainFrame
 
+-- Title
 Title.Parent = MainFrame
 Title.BackgroundTransparency = 1
 Title.Position = UDim2.new(0, 0, 0, 0)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Remote Spy (Fixed)"
+Title.Text = "Advanced Remote Spy - All Activity Monitor"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 16
+Title.TextSize = 14
 
+-- Filter Frame
+FilterFrame.Parent = MainFrame
+FilterFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+FilterFrame.BorderSizePixel = 0
+FilterFrame.Position = UDim2.new(0, 10, 0, 35)
+FilterFrame.Size = UDim2.new(1, -20, 0, 60)
+
+local FilterCorner = Instance.new("UICorner")
+FilterCorner.CornerRadius = UDim.new(0, 4)
+FilterCorner.Parent = FilterFrame
+
+FilterTitle.Parent = FilterFrame
+FilterTitle.BackgroundTransparency = 1
+FilterTitle.Position = UDim2.new(0, 5, 0, 0)
+FilterTitle.Size = UDim2.new(1, 0, 0, 20)
+FilterTitle.Font = Enum.Font.Gotham
+FilterTitle.Text = "Tracking Filters:"
+FilterTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+FilterTitle.TextSize = 10
+FilterTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Filter Buttons
+local filterButtons = {
+    {ChatToggle, "Chat: ON", Color3.fromRGB(100, 255, 100)},
+    {ClickToggle, "Clicks: ON", Color3.fromRGB(100, 255, 100)},
+    {MovementToggle, "Movement: ON", Color3.fromRGB(100, 255, 100)},
+    {RemoteToggle, "Remotes: ON", Color3.fromRGB(100, 255, 100)}
+}
+
+for i, data in pairs(filterButtons) do
+    local button = data[1]
+    button.Parent = FilterFrame
+    button.BackgroundColor3 = data[3]
+    button.BorderSizePixel = 0
+    button.Position = UDim2.new((i-1) * 0.25, 5, 0, 25)
+    button.Size = UDim2.new(0.24, -5, 0, 25)
+    button.Font = Enum.Font.Gotham
+    button.Text = data[2]
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 9
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 3)
+    corner.Parent = button
+end
+
+-- Log Frame
 LogFrame.Parent = MainFrame
 LogFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 LogFrame.BorderSizePixel = 0
-LogFrame.Position = UDim2.new(0, 10, 0, 40)
-LogFrame.Size = UDim2.new(1, -20, 1, -90)
+LogFrame.Position = UDim2.new(0, 10, 0, 105)
+LogFrame.Size = UDim2.new(1, -20, 1, -155)
 LogFrame.ScrollBarThickness = 8
 LogFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 LogFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -63,6 +126,7 @@ LogLayout.Parent = LogFrame
 LogLayout.Padding = UDim.new(0, 2)
 LogLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
+-- Control Buttons
 ClearButton.Parent = MainFrame
 ClearButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
 ClearButton.BorderSizePixel = 0
@@ -73,39 +137,24 @@ ClearButton.Text = "Clear Logs"
 ClearButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ClearButton.TextSize = 12
 
-local ClearCorner = Instance.new("UICorner")
-ClearCorner.CornerRadius = UDim.new(0, 4)
-ClearCorner.Parent = ClearButton
-
 ToggleButton.Parent = MainFrame
 ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
 ToggleButton.BorderSizePixel = 0
 ToggleButton.Position = UDim2.new(0, 120, 1, -40)
-ToggleButton.Size = UDim2.new(0, 100, 0, 30)
+ToggleButton.Size = UDim2.new(0, 120, 0, 30)
 ToggleButton.Font = Enum.Font.Gotham
 ToggleButton.Text = "Logging: ON"
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.TextSize = 12
 
-local ToggleCorner = Instance.new("UICorner")
-ToggleCorner.CornerRadius = UDim.new(0, 4)
-ToggleCorner.Parent = ToggleButton
+-- Add corners to buttons
+for _, button in pairs({ClearButton, ToggleButton}) do
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = button
+end
 
-ExportButton.Parent = MainFrame
-ExportButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-ExportButton.BorderSizePixel = 0
-ExportButton.Position = UDim2.new(0, 230, 1, -40)
-ExportButton.Size = UDim2.new(0, 100, 0, 30)
-ExportButton.Font = Enum.Font.Gotham
-ExportButton.Text = "Export Logs"
-ExportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ExportButton.TextSize = 12
-
-local ExportCorner = Instance.new("UICorner")
-ExportCorner.CornerRadius = UDim.new(0, 4)
-ExportCorner.Parent = ExportButton
-
--- Utility functions
+-- Utility Functions
 local function formatArgs(...)
     local args = {...}
     local formatted = {}
@@ -113,30 +162,10 @@ local function formatArgs(...)
     for i, arg in pairs(args) do
         if type(arg) == "string" then
             table.insert(formatted, '"' .. arg .. '"')
-        elseif type(arg) == "number" then
-            table.insert(formatted, tostring(arg))
-        elseif type(arg) == "boolean" then
-            table.insert(formatted, tostring(arg))
         elseif typeof(arg) == "Instance" then
             table.insert(formatted, arg:GetFullName())
         elseif typeof(arg) == "Vector3" then
-            table.insert(formatted, string.format("Vector3.new(%.2f, %.2f, %.2f)", arg.X, arg.Y, arg.Z))
-        elseif typeof(arg) == "CFrame" then
-            table.insert(formatted, "CFrame.new(...)")
-        elseif type(arg) == "table" then
-            local tableStr = "{"
-            local count = 0
-            for k, v in pairs(arg) do
-                if count < 3 then -- Limit to first 3 items
-                    tableStr = tableStr .. tostring(k) .. "=" .. tostring(v) .. ", "
-                    count = count + 1
-                else
-                    tableStr = tableStr .. "..."
-                    break
-                end
-            end
-            tableStr = tableStr .. "}"
-            table.insert(formatted, tableStr)
+            table.insert(formatted, string.format("Vector3(%.1f, %.1f, %.1f)", arg.X, arg.Y, arg.Z))
         else
             table.insert(formatted, tostring(arg))
         end
@@ -145,23 +174,21 @@ local function formatArgs(...)
     return table.concat(formatted, ", ")
 end
 
-local function addLog(remoteType, remoteName, remotePath, args)
+local function addLog(logType, action, details, color)
     if not isLogging then return end
     
     logCount = logCount + 1
     
     local logData = {
-        type = remoteType,
-        name = remoteName,
-        path = remotePath,
-        args = args,
+        type = logType,
+        action = action,
+        details = details,
         time = os.date("%H:%M:%S"),
         id = logCount
     }
     
     table.insert(logs, logData)
     
-    -- Remove old logs if we exceed the limit
     if #logs > maxLogs then
         table.remove(logs, 1)
     end
@@ -169,12 +196,12 @@ local function addLog(remoteType, remoteName, remotePath, args)
     -- Create GUI log entry
     local LogEntry = Instance.new("TextLabel")
     LogEntry.Parent = LogFrame
-    LogEntry.BackgroundColor3 = remoteType == "RemoteEvent" and Color3.fromRGB(50, 100, 50) or Color3.fromRGB(50, 50, 100)
+    LogEntry.BackgroundColor3 = color or Color3.fromRGB(50, 50, 50)
     LogEntry.BorderSizePixel = 0
-    LogEntry.Size = UDim2.new(1, -10, 0, 60)
+    LogEntry.Size = UDim2.new(1, -10, 0, 40)
     LogEntry.Font = Enum.Font.Code
     LogEntry.TextColor3 = Color3.fromRGB(255, 255, 255)
-    LogEntry.TextSize = 10
+    LogEntry.TextSize = 9
     LogEntry.TextWrapped = true
     LogEntry.TextXAlignment = Enum.TextXAlignment.Left
     LogEntry.TextYAlignment = Enum.TextYAlignment.Top
@@ -184,19 +211,18 @@ local function addLog(remoteType, remoteName, remotePath, args)
     EntryCorner.CornerRadius = UDim.new(0, 3)
     EntryCorner.Parent = LogEntry
     
-    local formattedArgs = formatArgs(unpack(args))
-    LogEntry.Text = string.format("[%s] %s\nPath: %s\nArgs: %s", 
+    LogEntry.Text = string.format("[%s] %s: %s\n%s", 
         logData.time, 
-        remoteType, 
-        remotePath, 
-        formattedArgs
+        logType,
+        action,
+        details
     )
     
     -- Auto-scroll to bottom
     task.wait()
     LogFrame.CanvasPosition = Vector2.new(0, LogFrame.AbsoluteCanvasSize.Y)
     
-    -- Remove old GUI entries if too many
+    -- Remove old GUI entries
     local children = LogFrame:GetChildren()
     local logEntries = {}
     for _, child in pairs(children) do
@@ -210,13 +236,13 @@ local function addLog(remoteType, remoteName, remotePath, args)
     end
 end
 
--- Hook into RemoteEvent and RemoteFunction using proper method if available
+-- Hooking Functions
 local function hookRemotes()
-    -- Method 1: Try to use hookfunction if available
-    if hookfunction then
+    -- Hook RemoteEvents and RemoteFunctions
+    if hookfunction and getnamecallmethod then
         local oldNamecall
         oldNamecall = hookfunction(game.namecall, function(self, ...)
-            if not isLogging then
+            if not trackRemotes or not isLogging then
                 return oldNamecall(self, ...)
             end
             
@@ -224,45 +250,65 @@ local function hookRemotes()
             local args = {...}
             
             if method == "FireServer" and self:IsA("RemoteEvent") then
-                addLog("RemoteEvent", self.Name, self:GetFullName(), args)
+                addLog("RemoteEvent", self.Name, "Args: " .. formatArgs(unpack(args)), Color3.fromRGB(100, 150, 100))
             elseif method == "InvokeServer" and self:IsA("RemoteFunction") then
-                addLog("RemoteFunction", self.Name, self:GetFullName(), args)
+                addLog("RemoteFunction", self.Name, "Args: " .. formatArgs(unpack(args)), Color3.fromRGB(100, 100, 150))
             end
             
             return oldNamecall(self, ...)
         end)
-        
-        addLog("System", "RemoteSpy", "System", {"Using hookfunction method"})
-    else
-        -- Method 2: Fallback to monitoring network events
-        local function monitorRemote(remote)
-            if remote:IsA("RemoteEvent") then
-                remote.OnClientEvent:Connect(function(...)
-                    addLog("RemoteEvent (Client)", remote.Name, remote:GetFullName(), {...})
-                end)
-            end
+    end
+    
+    -- Monitor existing remotes
+    for _, obj in pairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            obj.OnClientEvent:Connect(function(...)
+                if trackRemotes and isLogging then
+                    addLog("RemoteEvent", obj.Name .. " (Client)", "Args: " .. formatArgs(...), Color3.fromRGB(150, 100, 100))
+                end
+            end)
         end
-        
-        -- Monitor existing remotes
-        for _, remote in pairs(game:GetDescendants()) do
-            if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
-                monitorRemote(remote)
-            end
-        end
-        
-        -- Monitor new remotes
-        game.DescendantAdded:Connect(function(descendant)
-            if descendant:IsA("RemoteEvent") or descendant:IsA("RemoteFunction") then
-                task.wait() -- Wait a frame
-                monitorRemote(descendant)
-            end
-        end)
-        
-        addLog("System", "RemoteSpy", "System", {"Using fallback monitoring method"})
     end
 end
 
--- Button events
+-- Track User Input
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not trackClicks or not isLogging then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local mouse = LocalPlayer:GetMouse()
+        addLog("Click", "Left Click", string.format("Position: (%d, %d)", mouse.X, mouse.Y), Color3.fromRGB(255, 200, 100))
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        local mouse = LocalPlayer:GetMouse()
+        addLog("Click", "Right Click", string.format("Position: (%d, %d)", mouse.X, mouse.Y), Color3.fromRGB(255, 150, 100))
+    elseif input.UserInputType == Enum.UserInputType.Keyboard then
+        addLog("Keyboard", "Key Press", "Key: " .. input.KeyCode.Name, Color3.fromRGB(200, 200, 255))
+    end
+end)
+
+-- Track Movement
+local lastPosition = nil
+RunService.Heartbeat:Connect(function()
+    if not trackMovement or not isLogging then return end
+    
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local currentPos = LocalPlayer.Character.HumanoidRootPart.Position
+        if lastPosition and (currentPos - lastPosition).Magnitude > 5 then
+            addLog("Movement", "Position Change", string.format("From: %s To: %s", 
+                tostring(lastPosition), tostring(currentPos)), Color3.fromRGB(255, 255, 100))
+        end
+        lastPosition = currentPos
+    end
+end)
+
+-- Track Chat
+LocalPlayer.Chatted:Connect(function(message)
+    if trackChat and isLogging then
+        addLog("Chat", "Message Sent", "Message: " .. message, Color3.fromRGB(100, 255, 200))
+    end
+end)
+
+-- Button Events
 ClearButton.MouseButton1Click:Connect(function()
     logs = {}
     logCount = 0
@@ -275,40 +321,36 @@ end)
 
 ToggleButton.MouseButton1Click:Connect(function()
     isLogging = not isLogging
-    if isLogging then
-        ToggleButton.Text = "Logging: ON"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
-    else
-        ToggleButton.Text = "Logging: OFF"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-    end
+    ToggleButton.Text = isLogging and "Logging: ON" or "Logging: OFF"
+    ToggleButton.BackgroundColor3 = isLogging and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
 end)
 
-ExportButton.MouseButton1Click:Connect(function()
-    local exportString = "-- Remote Spy Export --\n"
-    exportString = exportString .. "-- Generated at: " .. os.date() .. "\n\n"
-    
-    for i, log in pairs(logs) do
-        exportString = exportString .. string.format(
-            "[%s] %s: %s\nArgs: %s\n\n",
-            log.time,
-            log.type,
-            log.path,
-            formatArgs(unpack(log.args))
-        )
-    end
-    
-    -- Try to copy to clipboard or print
-    if setclipboard then
-        setclipboard(exportString)
-        addLog("System", "RemoteSpy", "System", {"Logs copied to clipboard!"})
-    else
-        print(exportString)
-        addLog("System", "RemoteSpy", "System", {"Logs printed to console!"})
-    end
+-- Filter Button Events
+ChatToggle.MouseButton1Click:Connect(function()
+    trackChat = not trackChat
+    ChatToggle.Text = trackChat and "Chat: ON" or "Chat: OFF"
+    ChatToggle.BackgroundColor3 = trackChat and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+end)
+
+ClickToggle.MouseButton1Click:Connect(function()
+    trackClicks = not trackClicks
+    ClickToggle.Text = trackClicks and "Clicks: ON" or "Clicks: OFF"
+    ClickToggle.BackgroundColor3 = trackClicks and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+end)
+
+MovementToggle.MouseButton1Click:Connect(function()
+    trackMovement = not trackMovement
+    MovementToggle.Text = trackMovement and "Movement: ON" or "Movement: OFF"
+    MovementToggle.BackgroundColor3 = trackMovement and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+end)
+
+RemoteToggle.MouseButton1Click:Connect(function()
+    trackRemotes = not trackRemotes
+    RemoteToggle.Text = trackRemotes and "Remotes: ON" or "Remotes: OFF"
+    RemoteToggle.BackgroundColor3 = trackRemotes and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
 end)
 
 -- Initialize
 hookRemotes()
-print("Remote Spy (Fixed) loaded! All remote calls are now being logged.")
-addLog("System", "RemoteSpy", "System", {"Remote Spy initialized successfully!"})
+addLog("System", "Advanced Remote Spy", "Loaded successfully! Tracking all activity.", Color3.fromRGB(100, 255, 100))
+print("Advanced Remote Spy loaded! Now tracking clicks, movement, chat, and remotes.")
