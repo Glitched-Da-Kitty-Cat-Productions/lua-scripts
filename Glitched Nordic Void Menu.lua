@@ -219,6 +219,7 @@ OtherToolsSection:AddButton({
     end
 })
 
+
 -- Trolling Tab Section
 local TrollingSection = TrollingTab:AddSection({Name = "Trolling Tools", Position = "left"})
 TrollingSection:AddButton({
@@ -235,6 +236,36 @@ TrollingSection:AddButton({
 
 -- Games Tab Sections
 local GamesSection = GamesTab:AddSection({Name = "Game: " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, Position = "left"})
+-- Every Second You Get +1 Jump
+local gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+if gameName:lower():find("every second you get") or gameName == "Every Second You Get +1 Jump" then
+    GamesSection:AddParagraph({
+        Name = "Every Second You Get +1 Jump Information",
+        Content = "A simple game where your jump power increases every second. Use the teleport feature to reach the wins area quickly!"
+    })
+    GamesSection:AddButton({
+        Name = "Teleport to Wins",
+        Callback = function()
+            local success, err = pcall(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/Glitched-Da-Kitty-Cat-Productions/lua-scripts/refs/heads/main/tp-to-wins"))()
+            end)
+            if not success then
+                warn("Failed to execute Teleport to Wins: " .. tostring(err))
+            end
+        end
+    })
+    GamesSection:AddButton({
+        Name = "Teleport to 4k Wins",
+        Callback = function()
+            local success, err = pcall(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/Glitched-Da-Kitty-Cat-Productions/lua-scripts/refs/heads/main/4k-wins.lua"))()
+            end)
+            if not success then
+                warn("Failed to execute Teleport to 4k Wins: " .. tostring(err))
+            end
+        end
+    })
+end
 -- SlapBattles
 if game.PlaceId == 124596094333302 or game.PlaceId == 6403373529 then
     GamesSection:AddParagraph({
@@ -430,7 +461,7 @@ PlayerSections:AddToggle({
             inventoryBackup = {}
             local backpack = LocalPlayer:FindFirstChild("Backpack")
             local character = LocalPlayer.Character
-            
+
             -- Backup tools in backpack
             if backpack then
                 for _, item in pairs(backpack:GetChildren()) do
@@ -440,7 +471,7 @@ PlayerSections:AddToggle({
                     end
                 end
             end
-            
+
             -- Backup equipped tool
             if character then
                 local equippedTool = character:FindFirstChildOfClass("Tool")
@@ -469,18 +500,18 @@ PlayerSections:AddToggle({
                 deathConnection:Disconnect()
                 deathConnection = nil
             end
-            
+
             -- Wait for character to fully load before backing up
             task.wait(1)
             backupInventory()
-            
+
             local humanoid = char:WaitForChild("Humanoid")
             deathConnection = humanoid.Died:Connect(function()
                 -- Restore inventory when new character spawns
                 LocalPlayer.CharacterAdded:Wait()
                 restoreInventory()
             end)
-            
+
             -- Update backup when tools are added/removed
             if backpackConnection then
                 backpackConnection:Disconnect()
