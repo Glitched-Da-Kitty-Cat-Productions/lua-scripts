@@ -343,10 +343,16 @@ PlayerSections:AddToggle({
         local function restoreInventory()
             local backpack = LocalPlayer:FindFirstChild("Backpack")
             if backpack then
-                for _, item in pairs(inventoryBackup) do
-                    if not backpack:FindFirstChild(item.Name) then
-                        item.Parent = backpack
+                -- Remove all existing tools to prevent duplicates
+                for _, existingItem in pairs(backpack:GetChildren()) do
+                    if existingItem:IsA("Tool") then
+                        existingItem:Destroy()
                     end
+                end
+                -- Restore backup items by cloning to avoid issues
+                for _, item in pairs(inventoryBackup) do
+                    local clone = item:Clone()
+                    clone.Parent = backpack
                 end
             end
         end

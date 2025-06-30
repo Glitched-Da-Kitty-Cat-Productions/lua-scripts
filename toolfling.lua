@@ -22,7 +22,7 @@ local function fling()
 
         if hrp then
             vel = hrp.Velocity
-            hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+            hrp.Velocity = vel * 1000 + Vector3.new(0, 1000, 0)
             RunService.RenderStepped:Wait()
             hrp.Velocity = vel
             RunService.Stepped:Wait()
@@ -40,4 +40,9 @@ end)
 
 tool.Unequipped:Connect(function()
     hiddenfling = false
+    local c = player.Character
+    local hrp = c and c:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    end
 end)

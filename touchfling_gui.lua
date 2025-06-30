@@ -110,6 +110,13 @@ toggleButton.MouseButton1Click:Connect(function()
 	if hiddenfling then
 		flingThread = coroutine.create(fling)
 		coroutine.resume(flingThread)
+	else
+		local lp = Players.LocalPlayer
+		local c = lp.Character
+		local hrp = c and c:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			hrp.Velocity = Vector3.new(0, 0, 0)
+		end
 	end
 end)
 
