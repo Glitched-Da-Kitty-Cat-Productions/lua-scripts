@@ -11,12 +11,30 @@ local function scanForItems()
     local foundItems = {}
     
     -- Scan workspace for tools and items
-    local function scanContainer(container)
+    local function scanContainer(container, depth)
+        depth = depth or 0
+        if depth > 5 then return end -- Prevent infinite recursion
+        
         for _, item in pairs(container:GetChildren()) do
-            if item:IsA("Tool") or item:IsA("Model") then
+            -- Prioritize actual Tools
+            if item:IsA("Tool") then
                 table.insert(foundItems, item)
-            elseif item:IsA("Folder") or item:IsA("Model") then
-                scanContainer(item) -- Recursive scan
+            -- Check Models that might contain tools or be convertible to tools
+            elseif item:IsA("Model") and item.Name ~= "Terrain" and not item:FindFirstChild("Humanoid") then
+                -- Check if model contains tools
+                local hasTool = false
+                for _, child in pairs(item:GetChildren()) do
+                    if child:IsA("Tool") then
+                        table.insert(foundItems, child)
+                        hasTool = true
+                    end
+                end
+                -- If no tools inside, add the model itself (might be convertible)
+                if not hasTool and item:FindFirstChildOfClass("Part") then
+                    table.insert(foundItems, item)
+                end
+            elseif item:IsA("Folder") and not item.Name:lower():match("terrain") then
+                scanContainer(item, depth + 1) -- Recursive scan with depth limit
             end
         end
     end
@@ -33,6 +51,17 @@ local function scanForItems()
     pcall(function()
         scanContainer(game:GetService("ServerStorage"))
     end)
+    
+    -- Also check other players' backpacks for tools
+    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+        if player ~= LocalPlayer and player:FindFirstChild("Backpack") then
+            for _, tool in pairs(player.Backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    table.insert(foundItems, tool)
+                end
+            end
+        end
+    end
     
     return foundItems
 end
@@ -259,29 +288,81 @@ local function fillInventory()
             local randomItem = scannedItems[randomIndex]
             
             if randomItem and randomItem.Parent then
-                pcall(function()
-                    local clonedItem = randomItem:Clone()
-                    clonedItem.Parent = LocalPlayer.Backpack
-                    table.insert(grabbedItems, clonedItem.Name)
+                local success, result = pcall(function()
+                    local clonedItem
+                    
+                    -- If it's a Tool, clone it directly
+                    if randomItem:IsA("Tool") then
+                        clonedItem = randomItem:Clone()
+                        clonedItem.Parent = LocalPlayer.Backpack
+                        return clonedItem.Name
+                    
+                    -- If it's a Model, look for Tools inside it
+                    elseif randomItem:IsA("Model") then
+                        local toolFound = false
+                        for _, child in pairs(randomItem:GetChildren()) do
+                            if child:IsA("Tool") then
+                                clonedItem = child:Clone()
+                                clonedItem.Parent = LocalPlayer.Backpack
+                                toolFound = true
+                                return child.Name
+                            end
+                        end
+                        
+                        -- If no tool found, try to create a simple tool from the model
+                        if not toolFound then
+                            local newTool = Instance.new("Tool")
+                            newTool.Name = randomItem.Name
+                            newTool.RequiresHandle = false
+                            
+                            -- Try to find a handle or create one
+                            local handle = randomItem:FindFirstChildOfClass("Part")
+                            if handle then
+                                local newHandle = handle:Clone()
+                                newHandle.Name = "Handle"
+                                newHandle.Parent = newTool
+                            end
+                            
+                            newTool.Parent = LocalPlayer.Backpack
+                            return newTool.Name
+                        end
+                    end
+                    
+                    return nil
+                end)
+                
+                if success and result then
+                    table.insert(grabbedItems, result)
                     
                     -- Add to display list
                     local itemLabel = Instance.new("TextLabel")
                     itemLabel.Size = UDim2.new(1, -10, 0, 20)
                     itemLabel.BackgroundTransparency = 1
-                    itemLabel.Text = "★ GRABBED: " .. clonedItem.Name
+                    itemLabel.Text = "★ GRABBED: " .. result
                     itemLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                     itemLabel.TextSize = 12
                     itemLabel.Font = Enum.Font.SourceSansBold
                     itemLabel.TextXAlignment = Enum.TextXAlignment.Left
                     itemLabel.Parent = ItemsList
-                end)
+                else
+                    -- If failed, show what we tried to grab
+                    local itemLabel = Instance.new("TextLabel")
+                    itemLabel.Size = UDim2.new(1, -10, 0, 20)
+                    itemLabel.BackgroundTransparency = 1
+                    itemLabel.Text = "✗ FAILED: " .. randomItem.Name .. " (" .. randomItem.ClassName .. ")"
+                    itemLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+                    itemLabel.TextSize = 12
+                    itemLabel.Font = Enum.Font.SourceSans
+                    itemLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    itemLabel.Parent = ItemsList
+                end
             end
         end
         
         wait(0.1) -- Small delay
     end
     
-    StatusLabel.Text = "Successfully grabbed " .. #grabbedItems .. " random items!"
+    StatusLabel.Text = "Successfully grabbed " .. #grabbedItems .. " items! (Failed items shown in yellow)"
     StatusLabel.TextColor3 = Color3.fromRGB(76, 175, 80)
 end
 
