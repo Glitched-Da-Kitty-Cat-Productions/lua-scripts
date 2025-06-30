@@ -176,15 +176,6 @@ PlayerESPSection:AddToggle({
     end
 })
 
-PlayerESPSection:AddDropdown({
-    Name = "Box ESP Color",
-    Default = "Default",
-    Options = {"Default", "Red", "Orange", "Pink", "Rainbow", "Custom"},
-    Callback = function(value)
-        PlayerESP.BoxESPColor = value
-    end
-})
-
 PlayerESPSection:AddColorPicker({
     Name = "Box ESP Custom Color",
     Default = Color3.fromRGB(255, 255, 255),
@@ -193,16 +184,6 @@ PlayerESPSection:AddColorPicker({
         PlayerESP.BoxESPColor = "Custom"
     end
 })
-
-PlayerESPSection:AddDropdown({
-    Name = "Tracer ESP Color",
-    Default = "Default",
-    Options = {"Default", "Red", "Orange", "Pink", "Rainbow", "Custom"},
-    Callback = function(value)
-        PlayerESP.TracerESPColor = value
-    end
-})
-
 PlayerESPSection:AddColorPicker({
     Name = "Tracer ESP Custom Color",
     Default = Color3.fromRGB(255, 255, 255),
