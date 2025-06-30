@@ -153,46 +153,120 @@ StatusLabel.TextSize = 12
 
 -- Size Change Function
 local function changeCharacterSize(scale)
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") then
+    local character = LocalPlayer.Character
+    if not character then
         StatusLabel.Text = "Error: Character not found!"
         StatusLabel.TextColor3 = Color3.fromRGB(244, 67, 54)
         return false
     end
     
-    local humanoid = LocalPlayer.Character.Humanoid
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        StatusLabel.Text = "Error: Humanoid not found!"
+        StatusLabel.TextColor3 = Color3.fromRGB(244, 67, 54)
+        return false
+    end
     
-    -- Apply size change based on rig type
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then
+        StatusLabel.Text = "Error: HumanoidRootPart not found!"
+        StatusLabel.TextColor3 = Color3.fromRGB(244, 67, 54)
+        return false
+    end
+    
+    local success = false
+    
+    -- Try R15 scaling first
     if humanoid.RigType == Enum.HumanoidRigType.R15 then
-        -- R15 Character
-        LocalPlayer.Character.Humanoid.DepthScale.Value = scale
-        LocalPlayer.Character.Humanoid.HeightScale.Value = scale
-        LocalPlayer.Character.Humanoid.WidthScale.Value = scale
-    else
-        -- R6 Character
-        for _, part in pairs(LocalPlayer.Character:GetChildren()) do
-            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                part.Size = part.Size * scale
-                
-                -- Scale mesh if it exists
-                if part:FindFirstChildOfClass("SpecialMesh") then
-                    part:FindFirstChildOfClass("SpecialMesh").Scale = part:FindFirstChildOfClass("SpecialMesh").Scale * scale
-                end
+        local scaleSuccess = pcall(function()
+            -- Check if scale properties exist before using them
+            if humanoid:FindFirstChild("DepthScale") then
+                humanoid.DepthScale.Value = scale
             end
-        end
+            if humanoid:FindFirstChild("HeightScale") then  
+                humanoid.HeightScale.Value = scale
+            end
+            if humanoid:FindFirstChild("WidthScale") then
+                humanoid.WidthScale.Value = scale
+            end
+        end)
         
-        -- Scale accessories
-        for _, accessory in pairs(LocalPlayer.Character:GetChildren()) do
-            if accessory:IsA("Accessory") and accessory:FindFirstChild("Handle") then
-                accessory.Handle.Size = accessory.Handle.Size * scale
-                if accessory.Handle:FindFirstChild("Mesh") then
-                    accessory.Handle.Mesh.Scale = accessory.Handle.Mesh.Scale * scale
-                end
-            end
+        if scaleSuccess then
+            success = true
+            StatusLabel.Text = "R15 size changed to " .. tostring(scale) .. "x!"
+            StatusLabel.TextColor3 = Color3.fromRGB(76, 175, 80)
         end
     end
     
-    StatusLabel.Text = "Size changed to " .. tostring(scale) .. "x!"
-    StatusLabel.TextColor3 = Color3.fromRGB(76, 175, 80)
+    -- If R15 failed or it's R6, try manual scaling
+    if not success then
+        local manualSuccess = pcall(function()
+            -- Scale body parts with original size tracking
+            for _, part in pairs(character:GetChildren()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    -- Store original size if not already stored
+                    local originalSize = part:GetAttribute("OriginalSize")
+                    if not originalSize then
+                        part:SetAttribute("OriginalSize", part.Size)
+                        originalSize = part.Size
+                    end
+                    part.Size = originalSize * scale
+                    
+                    -- Scale meshes with original scale tracking
+                    for _, mesh in pairs(part:GetChildren()) do
+                        if mesh:IsA("SpecialMesh") then
+                            local originalScale = mesh:GetAttribute("OriginalScale")
+                            if not originalScale then
+                                mesh:SetAttribute("OriginalScale", mesh.Scale)
+                                originalScale = mesh.Scale
+                            end
+                            mesh.Scale = originalScale * scale
+                        end
+                    end
+                end
+            end
+            
+            -- Scale accessories with original size tracking
+            for _, accessory in pairs(character:GetChildren()) do
+                if accessory:IsA("Accessory") then
+                    local handle = accessory:FindFirstChild("Handle")
+                    if handle then
+                        local originalSize = handle:GetAttribute("OriginalSize")
+                        if not originalSize then
+                            handle:SetAttribute("OriginalSize", handle.Size)
+                            originalSize = handle.Size
+                        end
+                        handle.Size = originalSize * scale
+                        
+                        -- Scale accessory meshes
+                        for _, mesh in pairs(handle:GetChildren()) do
+                            if mesh:IsA("SpecialMesh") then
+                                local originalScale = mesh:GetAttribute("OriginalScale")
+                                if not originalScale then
+                                    mesh:SetAttribute("OriginalScale", mesh.Scale)
+                                    originalScale = mesh.Scale
+                                end
+                                mesh.Scale = originalScale * scale
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+        if manualSuccess then
+            success = true
+            StatusLabel.Text = "Manual size changed to " .. tostring(scale) .. "x!"
+            StatusLabel.TextColor3 = Color3.fromRGB(76, 175, 80)
+        end
+    end
+    
+    if not success then
+        StatusLabel.Text = "Error: Failed to change size!"
+        StatusLabel.TextColor3 = Color3.fromRGB(244, 67, 54)
+        return false
+    end
+    
     return true
 end
 
