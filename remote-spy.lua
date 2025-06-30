@@ -1,15 +1,15 @@
 
--- Remote Spy Script
--- Logs all RemoteEvent and RemoteFunction calls
+-- Remote Spy Script (Fixed Version)
+-- Logs all RemoteEvent and RemoteFunction calls using proper hooking
 
 local Players = game:GetService("Players")
-local LogService = game:GetService("LogService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Configuration
 local maxLogs = 1000
 local logs = {}
-local remoteConnections = {}
+local isLogging = true
+local logCount = 0
 
 -- GUI Creation
 local ScreenGui = Instance.new("ScreenGui")
@@ -41,10 +41,9 @@ Title.BackgroundTransparency = 1
 Title.Position = UDim2.new(0, 0, 0, 0)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Remote Spy"
+Title.Text = "Remote Spy (Fixed)"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
-Title.TextStrokeTransparency = 0.8
 
 LogFrame.Parent = MainFrame
 LogFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
@@ -106,10 +105,6 @@ local ExportCorner = Instance.new("UICorner")
 ExportCorner.CornerRadius = UDim.new(0, 4)
 ExportCorner.Parent = ExportButton
 
--- Variables
-local isLogging = true
-local logCount = 0
-
 -- Utility functions
 local function formatArgs(...)
     local args = {...}
@@ -129,7 +124,19 @@ local function formatArgs(...)
         elseif typeof(arg) == "CFrame" then
             table.insert(formatted, "CFrame.new(...)")
         elseif type(arg) == "table" then
-            table.insert(formatted, "Table")
+            local tableStr = "{"
+            local count = 0
+            for k, v in pairs(arg) do
+                if count < 3 then -- Limit to first 3 items
+                    tableStr = tableStr .. tostring(k) .. "=" .. tostring(v) .. ", "
+                    count = count + 1
+                else
+                    tableStr = tableStr .. "..."
+                    break
+                end
+            end
+            tableStr = tableStr .. "}"
+            table.insert(formatted, tableStr)
         else
             table.insert(formatted, tostring(arg))
         end
@@ -186,6 +193,7 @@ local function addLog(remoteType, remoteName, remotePath, args)
     )
     
     -- Auto-scroll to bottom
+    task.wait()
     LogFrame.CanvasPosition = Vector2.new(0, LogFrame.AbsoluteCanvasSize.Y)
     
     -- Remove old GUI entries if too many
@@ -202,50 +210,57 @@ local function addLog(remoteType, remoteName, remotePath, args)
     end
 end
 
--- Hook into remotes
-local function hookRemote(remote)
-    if remoteConnections[remote] then return end
-    
-    if remote:IsA("RemoteEvent") then
-        local oldFireServer = remote.FireServer
-        remote.FireServer = function(self, ...)
+-- Hook into RemoteEvent and RemoteFunction using proper method if available
+local function hookRemotes()
+    -- Method 1: Try to use hookfunction if available
+    if hookfunction then
+        local oldNamecall
+        oldNamecall = hookfunction(game.namecall, function(self, ...)
+            if not isLogging then
+                return oldNamecall(self, ...)
+            end
+            
+            local method = getnamecallmethod()
             local args = {...}
-            addLog("RemoteEvent", remote.Name, remote:GetFullName(), args)
-            return oldFireServer(self, ...)
+            
+            if method == "FireServer" and self:IsA("RemoteEvent") then
+                addLog("RemoteEvent", self.Name, self:GetFullName(), args)
+            elseif method == "InvokeServer" and self:IsA("RemoteFunction") then
+                addLog("RemoteFunction", self.Name, self:GetFullName(), args)
+            end
+            
+            return oldNamecall(self, ...)
+        end)
+        
+        addLog("System", "RemoteSpy", "System", {"Using hookfunction method"})
+    else
+        -- Method 2: Fallback to monitoring network events
+        local function monitorRemote(remote)
+            if remote:IsA("RemoteEvent") then
+                remote.OnClientEvent:Connect(function(...)
+                    addLog("RemoteEvent (Client)", remote.Name, remote:GetFullName(), {...})
+                end)
+            end
         end
         
-        remoteConnections[remote] = true
-    elseif remote:IsA("RemoteFunction") then
-        local oldInvokeServer = remote.InvokeServer
-        remote.InvokeServer = function(self, ...)
-            local args = {...}
-            addLog("RemoteFunction", remote.Name, remote:GetFullName(), args)
-            return oldInvokeServer(self, ...)
+        -- Monitor existing remotes
+        for _, remote in pairs(game:GetDescendants()) do
+            if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+                monitorRemote(remote)
+            end
         end
         
-        remoteConnections[remote] = true
+        -- Monitor new remotes
+        game.DescendantAdded:Connect(function(descendant)
+            if descendant:IsA("RemoteEvent") or descendant:IsA("RemoteFunction") then
+                task.wait() -- Wait a frame
+                monitorRemote(descendant)
+            end
+        end)
+        
+        addLog("System", "RemoteSpy", "System", {"Using fallback monitoring method"})
     end
 end
-
--- Scan for existing remotes
-local function scanForRemotes(parent)
-    for _, child in pairs(parent:GetDescendants()) do
-        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-            hookRemote(child)
-        end
-    end
-end
-
--- Hook into new remotes
-local function onDescendantAdded(descendant)
-    if descendant:IsA("RemoteEvent") or descendant:IsA("RemoteFunction") then
-        hookRemote(descendant)
-    end
-end
-
--- Initialize
-scanForRemotes(game)
-game.DescendantAdded:Connect(onDescendantAdded)
 
 -- Button events
 ClearButton.MouseButton1Click:Connect(function()
@@ -293,5 +308,7 @@ ExportButton.MouseButton1Click:Connect(function()
     end
 end)
 
-print("Remote Spy loaded! All remote calls are now being logged.")
-addLog("System", "RemoteSpy", "System", {"Remote Spy initialized!"})
+-- Initialize
+hookRemotes()
+print("Remote Spy (Fixed) loaded! All remote calls are now being logged.")
+addLog("System", "RemoteSpy", "System", {"Remote Spy initialized successfully!"})
