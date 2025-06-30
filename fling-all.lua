@@ -1,54 +1,78 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TeleportService = game:GetService("TeleportService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
--- Create fling tool if it doesn't exist
-local flingTool = player.Backpack:FindFirstChild("Fling Tool")
-if not flingTool then
-    flingTool = Instance.new("Tool")
-    flingTool.Name = "Fling Tool"
-    flingTool.RequiresHandle = false
-    flingTool.Parent = player.Backpack
-end
-
-local hiddenfling = false
-local flingThread
 local isRunning = false
+local originalCFrame = humanoidRootPart.CFrame
 
-local function fling()
-    local lp = player
-    local c, hrp, vel, movel = nil, nil, nil, 0.1
-
-    while hiddenfling do
-        RunService.Heartbeat:Wait()
-        c = lp.Character
-        hrp = c and c:FindFirstChild("HumanoidRootPart")
-
-        if hrp then
-            vel = hrp.Velocity
-            hrp.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
-            RunService.RenderStepped:Wait()
-            hrp.Velocity = vel
-            RunService.Stepped:Wait()
-            hrp.Velocity = vel + Vector3.new(0, movel, 0)
-            movel = -movel
-        end
+-- Anti-death measures
+local function protectPlayer()
+    if humanoid then
+        humanoid.PlatformStand = true
+        humanoidRootPart.Anchored = true
     end
 end
 
-local function startFling()
-    hiddenfling = true
-    flingThread = coroutine.create(fling)
-    coroutine.resume(flingThread)
+local function unprotectPlayer()
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoidRootPart.Anchored = false
+    end
 end
 
-local function stopFling()
-    hiddenfling = false
+-- Improved fling function with safety
+local function performFling(targetPlayer)
+    if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local targetHRP = targetPlayer.Character.HumanoidRootPart
+    local targetPosition = targetHRP.Position
+    
+    -- Protect ourselves before flinging
+    protectPlayer()
+    
+    -- Move close to target safely using TweenService
+    local moveInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local targetCFrame = CFrame.new(targetPosition + Vector3.new(0, 5, 0))
+    local moveTween = TweenService:Create(humanoidRootPart, moveInfo, {CFrame = targetCFrame})
+    
+    moveTween:Play()
+    moveTween.Completed:Wait()
+    
+    wait(0.2)
+    
+    -- Apply fling force to target
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+    bodyVelocity.Velocity = Vector3.new(
+        math.random(-100, 100),
+        math.random(50, 150),
+        math.random(-100, 100)
+    )
+    bodyVelocity.Parent = targetHRP
+    
+    -- Apply our own controlled velocity for fling effect
+    local ourBodyVelocity = Instance.new("BodyVelocity")
+    ourBodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+    ourBodyVelocity.Velocity = Vector3.new(0, 50, 0)
+    ourBodyVelocity.Parent = humanoidRootPart
+    
+    wait(0.1)
+    
+    -- Clean up
+    if bodyVelocity then bodyVelocity:Destroy() end
+    if ourBodyVelocity then ourBodyVelocity:Destroy() end
+    
+    wait(0.3)
+    
+    return true
 end
 
 local function flingAllPlayers()
@@ -58,13 +82,11 @@ local function flingAllPlayers()
     end
     
     isRunning = true
+    originalCFrame = humanoidRootPart.CFrame
+    
     print("Starting Fling All - targeting all players...")
     
-    -- Equip the fling tool
-    flingTool.Parent = character
-    wait(0.5)
-    
-    -- Get all players except local player
+    -- Get all valid targets
     local targetPlayers = {}
     for _, targetPlayer in pairs(Players:GetPlayers()) do
         if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -80,52 +102,34 @@ local function flingAllPlayers()
     
     print("Found " .. #targetPlayers .. " targets")
     
-    -- Store original position
-    local originalPosition = humanoidRootPart.CFrame
-    
-    -- Teleport to each player and fling
+    -- Fling each player
     for i, targetPlayer in pairs(targetPlayers) do
         if targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
             print("Targeting player " .. i .. "/" .. #targetPlayers .. ": " .. targetPlayer.Name)
             
-            -- Teleport to target
-            local targetPosition = targetPlayer.Character.HumanoidRootPart.CFrame
-            humanoidRootPart.CFrame = targetPosition + Vector3.new(0, 5, 0)
+            local success = performFling(targetPlayer)
+            if success then
+                print("Successfully flung " .. targetPlayer.Name)
+            else
+                print("Failed to fling " .. targetPlayer.Name)
+            end
             
-            wait(0.3)
-            
-            -- Start fling
-            startFling()
-            wait(2) -- Fling duration
-            stopFling()
-            
-            wait(0.5)
+            wait(0.8) -- Delay between targets
         end
     end
     
-    -- Return to original position
+    -- Return to original position safely
     print("Returning to original position...")
-    humanoidRootPart.CFrame = originalPosition
+    unprotectPlayer()
     
-    -- Unequip tool
-    flingTool.Parent = player.Backpack
+    local returnInfo = TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local returnTween = TweenService:Create(humanoidRootPart, returnInfo, {CFrame = originalCFrame})
+    returnTween:Play()
+    returnTween.Completed:Wait()
     
     print("Fling All completed!")
     isRunning = false
 end
-
--- Set up tool events
-flingTool.Equipped:Connect(function()
-    if not isRunning then
-        startFling()
-    end
-end)
-
-flingTool.Unequipped:Connect(function()
-    if not isRunning then
-        stopFling()
-    end
-end)
 
 -- Start the fling all process
 flingAllPlayers()
