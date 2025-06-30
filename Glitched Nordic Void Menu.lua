@@ -218,6 +218,28 @@ OtherToolsSection:AddButton({
         end
     end
 })
+OtherToolsSection:AddButton({
+    Name = "Remote Spy",
+    Callback = function()
+        local success, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Glitched-Da-Kitty-Cat-Productions/lua-scripts/refs/heads/main/remote-spy.lua"))()
+        end)
+        if not success then
+            warn("Failed to execute Remote Spy: " .. tostring(err))
+        end
+    end
+})
+OtherToolsSection:AddButton({
+    Name = "Particle Spammer",
+    Callback = function()
+        local success, err = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Glitched-Da-Kitty-Cat-Productions/lua-scripts/refs/heads/main/part-spammer.lua"))()
+        end)
+        if not success then
+            warn("Failed to execute Particle Spammer: " .. tostring(err))
+        end
+    end
+})
 
 
 -- Trolling Tab Section
