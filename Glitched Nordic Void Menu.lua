@@ -110,8 +110,6 @@ SafetySection:AddButton({
 
 -- Tools Tab Section
 local ToolsSection = ToolsTab:AddSection({Name = "Tools", Position = "left"})
-
--- Load Player ESP module
 local PlayerESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/Glitched-Da-Kitty-Cat-Productions/lua-scripts/refs/heads/main/plaer-esp.lua"))()
 
 -- Player ESP Section
@@ -140,7 +138,7 @@ PlayerESPSection:AddToggle({
 
 PlayerESPSection:AddToggle({
     Name = "Show Names",
-    Default = true,
+    Default = false,
     Callback = function(value)
         PlayerESP.ShowName = value
     end
@@ -148,7 +146,7 @@ PlayerESPSection:AddToggle({
 
 PlayerESPSection:AddToggle({
     Name = "Show Health",
-    Default = true,
+    Default = false,
     Callback = function(value)
         PlayerESP.ShowHealth = value
     end
@@ -156,7 +154,7 @@ PlayerESPSection:AddToggle({
 
 PlayerESPSection:AddToggle({
     Name = "Show Distance",
-    Default = true,
+    Default = false,
     Callback = function(value)
         PlayerESP.ShowDistance = value
     end
@@ -164,7 +162,7 @@ PlayerESPSection:AddToggle({
 
 PlayerESPSection:AddToggle({
     Name = "Box ESP",
-    Default = true,
+    Default = false,
     Callback = function(value)
         PlayerESP.BoxESP = value
     end
@@ -175,6 +173,42 @@ PlayerESPSection:AddToggle({
     Default = false,
     Callback = function(value)
         PlayerESP.TracerESP = value
+    end
+})
+
+PlayerESPSection:AddDropdown({
+    Name = "Box ESP Color",
+    Default = "Default",
+    Options = {"Default", "Red", "Orange", "Pink", "Rainbow", "Custom"},
+    Callback = function(value)
+        PlayerESP.BoxESPColor = value
+    end
+})
+
+PlayerESPSection:AddColorPicker({
+    Name = "Box ESP Custom Color",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        PlayerESP.BoxESPCustomColor = color
+        PlayerESP.BoxESPColor = "Custom"
+    end
+})
+
+PlayerESPSection:AddDropdown({
+    Name = "Tracer ESP Color",
+    Default = "Default",
+    Options = {"Default", "Red", "Orange", "Pink", "Rainbow", "Custom"},
+    Callback = function(value)
+        PlayerESP.TracerESPColor = value
+    end
+})
+
+PlayerESPSection:AddColorPicker({
+    Name = "Tracer ESP Custom Color",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(color)
+        PlayerESP.TracerESPCustomColor = color
+        PlayerESP.TracerESPColor = "Custom"
     end
 })
 

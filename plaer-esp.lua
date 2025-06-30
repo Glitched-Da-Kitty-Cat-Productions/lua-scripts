@@ -15,6 +15,8 @@ PlayerESP.ShowName = true
 PlayerESP.BoxESP = true
 PlayerESP.TracerESP = false
 PlayerESP.ESPColor = Color3.fromRGB(255, 255, 255)
+PlayerESP.BoxESPColor = "Default" -- Options: Default, Red, Rainbow
+PlayerESP.TracerESPColor = "Default" -- Options: Default, Red, Rainbow
 PlayerESP.EnemyColor = Color3.fromRGB(255, 0, 0)
 PlayerESP.TeamColor = Color3.fromRGB(0, 255, 0)
 
@@ -127,10 +129,45 @@ local function updateESP(player)
     local distance = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) 
         and math.floor((LocalPlayer.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude) or 0
     
-    -- Choose color based on team
-    local espColor = PlayerESP.ESPColor
+    -- Helper function for rainbow color
+    local function getRainbowColor(speed)
+        local hue = (tick() * speed) % 1
+        local r, g, b = Color3.fromHSV(hue, 1, 1).r, Color3.fromHSV(hue, 1, 1).g, Color3.fromHSV(hue, 1, 1).b
+        return Color3.new(r, g, b)
+    end
+    
+    -- Determine box color
+    local boxColor = PlayerESP.ESPColor
     if PlayerESP.TeamCheck then
-        espColor = (player.Team == LocalPlayer.Team) and PlayerESP.TeamColor or PlayerESP.EnemyColor
+        boxColor = (player.Team == LocalPlayer.Team) and PlayerESP.TeamColor or PlayerESP.EnemyColor
+    end
+    if PlayerESP.BoxESPColor == "Red" then
+        boxColor = Color3.fromRGB(255, 0, 0)
+    elseif PlayerESP.BoxESPColor == "Orange" then
+        boxColor = Color3.fromRGB(255, 165, 0)
+    elseif PlayerESP.BoxESPColor == "Pink" then
+        boxColor = Color3.fromRGB(255, 105, 180)
+    elseif PlayerESP.BoxESPColor == "Rainbow" then
+        boxColor = getRainbowColor(2)
+    elseif PlayerESP.BoxESPColor == "Custom" and PlayerESP.BoxESPCustomColor then
+        boxColor = PlayerESP.BoxESPCustomColor
+    end
+    
+    -- Determine tracer color
+    local tracerColor = PlayerESP.ESPColor
+    if PlayerESP.TeamCheck then
+        tracerColor = (player.Team == LocalPlayer.Team) and PlayerESP.TeamColor or PlayerESP.EnemyColor
+    end
+    if PlayerESP.TracerESPColor == "Red" then
+        tracerColor = Color3.fromRGB(255, 0, 0)
+    elseif PlayerESP.TracerESPColor == "Orange" then
+        tracerColor = Color3.fromRGB(255, 165, 0)
+    elseif PlayerESP.TracerESPColor == "Pink" then
+        tracerColor = Color3.fromRGB(255, 105, 180)
+    elseif PlayerESP.TracerESPColor == "Rainbow" then
+        tracerColor = getRainbowColor(2)
+    elseif PlayerESP.TracerESPColor == "Custom" and PlayerESP.TracerESPCustomColor then
+        tracerColor = PlayerESP.TracerESPCustomColor
     end
     
     -- Box ESP
@@ -141,7 +178,7 @@ local function updateESP(player)
         
         box.Size = Vector2.new(boxWidth, boxHeight)
         box.Position = Vector2.new(rootPos.X - boxWidth/2, headPos.Y)
-        box.Color = espColor
+        box.Color = boxColor
         box.Visible = true
     else
         ESPObjects[player].Box.Visible = false
@@ -153,7 +190,7 @@ local function updateESP(player)
         local screenSize = Camera.ViewportSize
         tracer.From = Vector2.new(screenSize.X/2, screenSize.Y)
         tracer.To = Vector2.new(rootPos.X, rootPos.Y)
-        tracer.Color = espColor
+        tracer.Color = tracerColor
         tracer.Visible = true
     else
         ESPObjects[player].Tracer.Visible = false
