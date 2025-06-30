@@ -184,6 +184,7 @@ PlayerESPSection:AddColorPicker({
         PlayerESP.BoxESPColor = "Custom"
     end
 })
+
 PlayerESPSection:AddColorPicker({
     Name = "Tracer ESP Custom Color",
     Default = Color3.fromRGB(255, 255, 255),
