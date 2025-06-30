@@ -1,6 +1,6 @@
 
 -- Elemental Powers Tycoon Auto Chest Collector
--- Monitors workspace.Treasure.Chests for new chests and auto-collects them
+-- Monitors workspace.Treasure.Chests.Chest and cycles through indices 1-5
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -16,6 +16,7 @@ local humanoid = character:WaitForChild("Humanoid")
 local chestQueue = {}
 local isCollecting = false
 local monitoring = true
+local checkedIndices = {}
 
 -- Function to teleport player
 local function teleportTo(position)
@@ -25,25 +26,21 @@ local function teleportTo(position)
     end
 end
 
--- Function to simulate holding E key (improved version)
+-- Function to simulate holding E key
 local function holdEKey(duration)
     print("Holding E key for", duration, "seconds")
     
-    -- Try multiple methods to trigger E key
-    local success = false
-    
     -- Method 1: VirtualInputManager
-    pcall(function()
+    local success = pcall(function()
         game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
         wait(duration)
         game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        success = true
     end)
     
-    -- Method 2: If VirtualInputManager fails, try firing proximity prompts directly
+    -- Method 2: Fire proximity prompts directly
     if not success then
         local function findAndFirePrompts()
-            for i = 1, duration * 10 do -- Check 10 times per second
+            for i = 1, duration * 10 do
                 for _, obj in pairs(workspace:GetDescendants()) do
                     if obj:IsA("ProximityPrompt") and obj.Enabled then
                         local distance = (obj.Parent.Position - humanoidRootPart.Position).Magnitude
@@ -62,18 +59,14 @@ local function holdEKey(duration)
     end
 end
 
--- Function to get chest position more reliably
+-- Function to get chest position
 local function getChestPosition(chest)
-    -- Try multiple methods to find a valid position
     local position = nil
     
-    -- Method 1: PrimaryPart
     if chest.PrimaryPart then
         position = chest.PrimaryPart.Position
-    -- Method 2: Part named "Part"
     elseif chest:FindFirstChild("Part") then
         position = chest.Part.Position
-    -- Method 3: Any BasePart
     else
         local part = chest:FindFirstChildOfClass("BasePart")
         if part then
@@ -85,112 +78,89 @@ local function getChestPosition(chest)
 end
 
 -- Function to collect a chest
-local function collectChest(chest)
+local function collectChest(chest, index)
     if not chest or not chest.Parent then
         print("Chest is nil or has no parent")
         return
     end
     
     isCollecting = true
-    print("Collecting chest:", chest.Name)
+    print("Collecting chest at index:", index)
     
     -- Get chest position
     local chestPosition = getChestPosition(chest)
     if not chestPosition then
-        print("Could not find chest position for:", chest.Name)
+        print("Could not find chest position for index:", index)
         isCollecting = false
         return
     end
     
-    -- Teleport to chest position (closer to the chest)
-    local teleportPosition = chestPosition + Vector3.new(0, 2, 0) -- Only 2 studs above
+    -- Teleport to chest position
+    local teleportPosition = chestPosition + Vector3.new(0, 2, 0)
     teleportTo(teleportPosition)
     
-    wait(1) -- Wait longer after teleporting
+    wait(0.5) -- Short wait after teleporting
     
     -- Hold E for 5 seconds to collect
     holdEKey(5)
     
-    print("Finished collecting chest:", chest.Name)
-    wait(2) -- Wait before moving to next chest
+    print("Finished collecting chest at index:", index)
+    checkedIndices[index] = true
+    wait(0.5) -- Short wait before next chest
     
     isCollecting = false
+end
+
+-- Function to check for chests at all indices
+local function checkAllChestIndices()
+    while monitoring do
+        if not isCollecting then
+            local treasureFolder = workspace:FindFirstChild("Treasure")
+            if treasureFolder then
+                local chestsFolder = treasureFolder:FindFirstChild("Chests")
+                if chestsFolder then
+                    -- Check for direct Chest object first
+                    local directChest = chestsFolder:FindFirstChild("Chest")
+                    if directChest and not checkedIndices["direct"] then
+                        print("Found direct Chest object!")
+                        table.insert(chestQueue, {chest = directChest, index = "direct"})
+                    end
+                    
+                    -- Check indices 1-5 for chests
+                    local children = chestsFolder:GetChildren()
+                    for i = 1, 5 do
+                        if children[i] and children[i].Name == "Chest" and not checkedIndices[i] then
+                            print("Found chest at index", i, ":", children[i].Name)
+                            table.insert(chestQueue, {chest = children[i], index = i})
+                        end
+                    end
+                end
+            end
+        end
+        wait(0.2) -- Check every 0.2 seconds for fast detection
+    end
 end
 
 -- Function to process chest queue
 local function processChestQueue()
     while monitoring do
         if #chestQueue > 0 and not isCollecting then
-            local chest = table.remove(chestQueue, 1)
-            if chest and chest.Parent then
-                collectChest(chest)
+            local chestData = table.remove(chestQueue, 1)
+            if chestData.chest and chestData.chest.Parent then
+                collectChest(chestData.chest, chestData.index)
             end
         end
         wait(0.1)
     end
 end
 
--- Function to monitor for new chests
-local function monitorChests()
-    -- Wait for workspace structure
-    local treasureFolder = workspace:WaitForChild("Treasure", 10)
-    if not treasureFolder then
-        print("Could not find Treasure folder in workspace!")
-        return
+-- Function to reset checked indices periodically
+local function resetCheckedIndices()
+    while monitoring do
+        wait(30) -- Reset every 30 seconds to allow re-collection
+        checkedIndices = {}
+        print("Reset checked indices - can collect chests again!")
     end
-    
-    local chestsFolder = treasureFolder:WaitForChild("Chests", 10)
-    if not chestsFolder then
-        print("Could not find Chests folder in Treasure!")
-        return
-    end
-    
-    print("Found Chests folder, starting monitoring...")
-    
-    -- Track chest count to detect new ones
-    local lastChestCount = #chestsFolder:GetChildren()
-    print("Initial chest count:", lastChestCount)
-    
-    -- Monitor for chest count changes
-    local function checkForNewChests()
-        local currentChests = chestsFolder:GetChildren()
-        local currentCount = #currentChests
-        
-        if currentCount > lastChestCount then
-            print("New chest detected! Count increased from", lastChestCount, "to", currentCount)
-            
-            -- Get the newest chest (highest index)
-            local newestChest = currentChests[currentCount]
-            if newestChest then
-                table.insert(chestQueue, newestChest)
-                print("Added newest chest to queue:", newestChest.Name, "at index", currentCount)
-                print("Queue size:", #chestQueue)
-            end
-            
-            lastChestCount = currentCount
-        elseif currentCount < lastChestCount then
-            print("Chest removed. Count decreased from", lastChestCount, "to", currentCount)
-            lastChestCount = currentCount
-        end
-    end
-    
-    -- Check every 0.5 seconds for new chests
-    spawn(function()
-        while monitoring do
-            checkForNewChests()
-            wait(0.5)
-        end
-    end)
-    
-    -- Also monitor ChildAdded as backup
-    chestsFolder.ChildAdded:Connect(function(child)
-        print("ChildAdded detected:", child.Name)
-        wait(0.1) -- Small delay to ensure it's properly added
-        checkForNewChests()
-    end)
-    
-    print("Chest monitoring started for Elemental Powers Tycoon!")
-    print("Watching workspace.Treasure.Chests for new chests using index monitoring...")
 end
 
 -- Handle character respawn
@@ -201,11 +171,12 @@ plr.CharacterAdded:Connect(function(newCharacter)
     print("Character respawned, updated references")
 end)
 
--- Start monitoring and processing
-spawn(monitorChests)
+-- Start all processes
+spawn(checkAllChestIndices)
 spawn(processChestQueue)
+spawn(resetCheckedIndices)
 
--- Optional: Add a way to stop the script
+-- Stop script with F9
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.F9 then
         monitoring = false
@@ -213,32 +184,37 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Debug: Add manual chest collection for testing
+-- Manual check with F8
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.F8 then
-        print("Manual chest detection triggered...")
+        print("Manual chest check triggered...")
+        checkedIndices = {} -- Reset to allow immediate collection
         local treasureFolder = workspace:FindFirstChild("Treasure")
         if treasureFolder then
             local chestsFolder = treasureFolder:FindFirstChild("Chests")
             if chestsFolder then
-                local chests = chestsFolder:GetChildren()
-                print("Found", #chests, "chests in folder")
-                
-                for i, chest in pairs(chests) do
-                    print("Chest", i, ":", chest.Name)
-                    table.insert(chestQueue, chest)
-                    print("Manually added chest to queue:", chest.Name, "at index", i)
+                -- Check direct Chest
+                local directChest = chestsFolder:FindFirstChild("Chest")
+                if directChest then
+                    print("Found direct Chest!")
+                    table.insert(chestQueue, {chest = directChest, index = "direct"})
                 end
-                print("Manual detection complete. Queue size:", #chestQueue)
-            else
-                print("No Chests folder found!")
+                
+                -- Check all indices
+                local children = chestsFolder:GetChildren()
+                for i = 1, 5 do
+                    if children[i] and children[i].Name == "Chest" then
+                        print("Found chest at index", i)
+                        table.insert(chestQueue, {chest = children[i], index = i})
+                    end
+                end
+                print("Manual check complete. Queue size:", #chestQueue)
             end
-        else
-            print("No Treasure folder found!")
         end
     end
 end)
 
 print("Elemental Powers Tycoon Chest Collector loaded!")
+print("Looking for workspace.Treasure.Chests.Chest and checking indices 1-5")
 print("Press F9 to stop the script.")
-print("Press F8 to manually detect existing chests.")
+print("Press F8 to manually check for chests.")
