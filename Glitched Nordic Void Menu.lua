@@ -110,7 +110,77 @@ SafetySection:AddButton({
 
 -- Tools Tab Section
 local ToolsSection = ToolsTab:AddSection({Name = "Tools", Position = "left"})
-ToolsSection:AddButton({
+
+-- Load Player ESP module
+local PlayerESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/Glitched-Da-Kitty-Cat-Productions/lua-scripts/refs/heads/main/plaer-esp.lua"))()
+
+-- Player ESP Section
+local PlayerESPSection = ToolsTab:AddSection({Name = "Player ESP", Position = "left"})
+
+PlayerESPSection:AddToggle({
+    Name = "Enable Player ESP",
+    Default = false,
+    Callback = function(value)
+        if value then
+            PlayerESP:Init()
+            PlayerESP:Toggle(true)
+        else
+            PlayerESP:Toggle(false)
+        end
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Team Check",
+    Default = false,
+    Callback = function(value)
+        PlayerESP.TeamCheck = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Show Names",
+    Default = true,
+    Callback = function(value)
+        PlayerESP.ShowName = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Show Health",
+    Default = true,
+    Callback = function(value)
+        PlayerESP.ShowHealth = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Show Distance",
+    Default = true,
+    Callback = function(value)
+        PlayerESP.ShowDistance = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Box ESP",
+    Default = true,
+    Callback = function(value)
+        PlayerESP.BoxESP = value
+    end
+})
+
+PlayerESPSection:AddToggle({
+    Name = "Tracer ESP",
+    Default = false,
+    Callback = function(value)
+        PlayerESP.TracerESP = value
+    end
+})
+
+-- Other Tools Section
+local OtherToolsSection = ToolsTab:AddSection({Name = "Other Tools", Position = "left"})
+OtherToolsSection:AddButton({
     Name = "Touch Fling Tool",
     Callback = function()
         local success, err = pcall(function()
@@ -121,7 +191,7 @@ ToolsSection:AddButton({
         end
     end
 })
-ToolsSection:AddButton({
+OtherToolsSection:AddButton({
     Name = "Aimbot",
     Callback = function()
         local success, err = pcall(function()
