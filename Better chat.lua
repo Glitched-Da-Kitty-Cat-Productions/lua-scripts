@@ -349,13 +349,42 @@ local function sendMessage()
         end
     end
     
-    -- Send message to other players (if in a supported game)
+    -- Send message to real Roblox chat system
+    local chatSuccess = false
     pcall(function()
-        game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, "All")
+        -- Try new chat system first
+        local TextChatService = game:GetService("TextChatService")
+        if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            local textChannel = TextChatService:FindFirstChild("TextChannels"):FindFirstChild("RBXGeneral")
+            if textChannel then
+                textChannel:SendAsync(message)
+                chatSuccess = true
+            end
+        end
     end)
     
-    -- Add to our enhanced chat
-    addMessage(LocalPlayer, message, false)
+    -- Fallback to legacy chat system
+    if not chatSuccess then
+        pcall(function()
+            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, "All")
+            chatSuccess = true
+        end)
+    end
+    
+    -- If neither worked, try Players:Chat
+    if not chatSuccess then
+        pcall(function()
+            LocalPlayer:Chat(message)
+            chatSuccess = true
+        end)
+    end
+    
+    -- Add to our enhanced chat only if message was sent successfully
+    if chatSuccess then
+        addMessage(LocalPlayer, message, false)
+    else
+        addMessage(LocalPlayer, "[FAILED TO SEND] " .. message, true)
+    end
 end
 
 -- Event Connections
@@ -372,19 +401,39 @@ ToggleButton.MouseButton1Click:Connect(function()
     ToggleButton.Text = MainFrame.Visible and "Hide" or "Chat"
 end)
 
--- Listen for other players' messages
+-- Listen for messages from both new and legacy chat systems
 pcall(function()
-    local chatEvents = game:GetService("ReplicatedStorage"):WaitForChild("DefaultChatSystemChatEvents")
-    local onMessageDoneFiltering = chatEvents:WaitForChild("OnMessageDoneFiltering")
+    local TextChatService = game:GetService("TextChatService")
     
-    onMessageDoneFiltering.OnClientEvent:Connect(function(messageData)
-        if messageData.FromSpeaker ~= LocalPlayer.Name then
-            local speaker = Players:FindFirstChild(messageData.FromSpeaker)
-            if speaker then
-                addMessage(speaker, messageData.Message, false)
+    -- Handle new TextChatService messages
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        TextChatService.MessageReceived:Connect(function(textChatMessage)
+            local speaker = Players:FindFirstChild(textChatMessage.TextSource.Name)
+            if speaker and speaker ~= LocalPlayer then
+                addMessage(speaker, textChatMessage.Text, false)
             end
-        end
-    end)
+        end)
+    else
+        -- Handle legacy chat system messages
+        local chatEvents = game:GetService("ReplicatedStorage"):WaitForChild("DefaultChatSystemChatEvents")
+        local onMessageDoneFiltering = chatEvents:WaitForChild("OnMessageDoneFiltering")
+        
+        onMessageDoneFiltering.OnClientEvent:Connect(function(messageData)
+            if messageData.FromSpeaker ~= LocalPlayer.Name then
+                local speaker = Players:FindFirstChild(messageData.FromSpeaker)
+                if speaker then
+                    addMessage(speaker, messageData.Message, false)
+                end
+            end
+        end)
+    end
+end)
+
+-- Also listen for Player:Chat events as backup
+Players.PlayerChatted:Connect(function(chatType, player, message, targetPlayer)
+    if player ~= LocalPlayer and chatType == Enum.ChatType.All then
+        addMessage(player, message, false)
+    end
 end)
 
 -- Player join/leave notifications
@@ -396,16 +445,25 @@ Players.PlayerRemoving:Connect(function(player)
     addMessage(player, player.Name .. " left the game!", true)
 end)
 
--- Hide default chat
+-- Configure chat integration
 pcall(function()
-    game:GetService("StarterGui"):SetCore("ChatMakeSystemMessage", {
-        Text = "Enhanced Chat loaded! Default chat disabled.";
-        Color = Color3.fromRGB(100, 255, 100);
-        Font = Enum.Font.GothamBold;
-        FontSize = Enum.FontSize.Size18;
-    })
+    local TextChatService = game:GetService("TextChatService")
     
-    game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        -- For new chat system, hide the chat input but keep functionality
+        TextChatService.ChatInputBarConfiguration.Enabled = false
+        addMessage(LocalPlayer, "Enhanced Chat loaded! Synced with TextChatService.", true)
+    else
+        -- For legacy chat system
+        game:GetService("StarterGui"):SetCore("ChatMakeSystemMessage", {
+            Text = "Enhanced Chat loaded! Synced with legacy chat.";
+            Color = Color3.fromRGB(100, 255, 100);
+            Font = Enum.Font.GothamBold;
+            FontSize = Enum.FontSize.Size18;
+        })
+        -- Keep chat enabled for message sending but hide the GUI
+        game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)
+    end
 end)
 
 -- Welcome message
