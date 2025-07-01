@@ -15,10 +15,12 @@ PlayerESP.ShowName = true
 PlayerESP.BoxESP = true
 PlayerESP.TracerESP = false
 PlayerESP.ESPColor = Color3.fromRGB(255, 255, 255)
-PlayerESP.BoxESPColor = "Default" -- Options: Default, Red, Rainbow
-PlayerESP.TracerESPColor = "Default" -- Options: Default, Red, Rainbow
+PlayerESP.BoxESPColor = "Default"
+PlayerESP.TracerESPColor = "Default"
 PlayerESP.EnemyColor = Color3.fromRGB(255, 0, 0)
 PlayerESP.TeamColor = Color3.fromRGB(0, 255, 0)
+PlayerESP.BoxESPCustomColor = Color3.fromRGB(255, 255, 255)
+PlayerESP.TracerESPCustomColor = Color3.fromRGB(255, 255, 255)
 
 local ESPObjects = {}
 local Connections = {}
@@ -132,8 +134,7 @@ local function updateESP(player)
     -- Helper function for rainbow color
     local function getRainbowColor(speed)
         local hue = (tick() * speed) % 1
-        local r, g, b = Color3.fromHSV(hue, 1, 1).r, Color3.fromHSV(hue, 1, 1).g, Color3.fromHSV(hue, 1, 1).b
-        return Color3.new(r, g, b)
+        return Color3.fromHSV(hue, 1, 1)
     end
     
     -- Determine box color
@@ -201,7 +202,7 @@ local function updateESP(player)
         local nameObj = ESPObjects[player].Name
         nameObj.Text = player.DisplayName ~= player.Name and player.DisplayName .. " (@" .. player.Name .. ")" or player.Name
         nameObj.Position = Vector2.new(rootPos.X, headPos.Y - 20)
-        nameObj.Color = espColor
+        nameObj.Color = boxColor
         nameObj.Visible = true
     else
         ESPObjects[player].Name.Visible = false
@@ -227,7 +228,7 @@ local function updateESP(player)
         if PlayerESP.ShowName then yOffset = yOffset - 15 end
         if PlayerESP.ShowHealth then yOffset = yOffset - 15 end
         distanceObj.Position = Vector2.new(rootPos.X, headPos.Y + yOffset)
-        distanceObj.Color = espColor
+        distanceObj.Color = boxColor
         distanceObj.Visible = true
     else
         ESPObjects[player].Distance.Visible = false
