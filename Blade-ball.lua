@@ -1,62 +1,51 @@
 
--- Blade Ball Auto Parry Script (Fixed Version)
--- Automatically detects and parries incoming balls
+-- Blade Ball Auto Parry Script (Enhanced Version)
+-- Automatically detects and parries incoming balls with visualizer
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
 
 -- Configuration
 local AutoParry = {
-    Enabled = true, -- Auto-enabled on load
-    ParryDistance = 25, -- Increased distance for better detection
-    ParryKey = Enum.KeyCode.F, -- Key to toggle auto parry
-    DebugMode = true -- Show debug messages
+    Enabled = true,
+    ParryThreshold = 0.55, -- Time threshold for parrying (distance/speed)
+    ParryKey = Enum.KeyCode.F,
+    DebugMode = true,
+    NotificationEnabled = true
 }
 
 -- Variables
 local Connections = {}
-local ParryRemote = nil
-local LastParryTime = 0
-local ParryDebounce = 0.5 -- Prevent spam clicking
+local Cooldown = tick()
+local IsParried = false
+local Connection = nil
 
--- GUI Elements for visual feedback
+-- GUI Elements
 local ScreenGui = nil
 local StatusLabel = nil
 
--- Find parry remote (updated for current Blade Ball)
-local function findParryRemote()
-    local possiblePaths = {
-        ReplicatedStorage:FindFirstChild("Remotes"),
-        ReplicatedStorage:FindFirstChild("Events"),
-        ReplicatedStorage
-    }
+-- Send notification
+local function sendNotification(title, text, duration)
+    if not AutoParry.NotificationEnabled then return end
     
-    local possibleNames = {
-        "ParryButtonPress", "Parry", "ParryAttempt", "ParryBall", 
-        "Deflect", "ParryRemote", "Block", "Hit"
-    }
-    
-    for _, parent in pairs(possiblePaths) do
-        if parent then
-            for _, name in pairs(possibleNames) do
-                local remote = parent:FindFirstChild(name)
-                if remote and (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then
-                    return remote
-                end
-            end
-        end
-    end
-    
-    return nil
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Icon = "rbxassetid://135351041318579",
+            Duration = duration or 5,
+            Button1 = "OK"
+        })
+    end)
 end
 
--- Create GUI
+-- Create enhanced GUI
 local function createGUI()
     if ScreenGui then return end
     
@@ -67,138 +56,131 @@ local function createGUI()
     
     StatusLabel = Instance.new("TextLabel")
     StatusLabel.Parent = ScreenGui
-    StatusLabel.Size = UDim2.new(0, 250, 0, 60)
+    StatusLabel.Size = UDim2.new(0, 280, 0, 80)
     StatusLabel.Position = UDim2.new(0, 10, 0, 10)
-    StatusLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    StatusLabel.BackgroundTransparency = 0.2
+    StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    StatusLabel.BackgroundTransparency = 0.1
+    StatusLabel.BorderSizePixel = 0
     StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    StatusLabel.TextSize = 18
+    StatusLabel.TextSize = 16
     StatusLabel.Font = Enum.Font.GothamBold
-    StatusLabel.Text = "Auto Parry: ON\nPress F to toggle"
+    StatusLabel.Text = "🛡️ Auto Parry: ON\n🎯 Status: Waiting\n⌨️ Press F to toggle"
     StatusLabel.TextWrapped = true
+    StatusLabel.TextYAlignment = Enum.TextYAlignment.Center
     
     local corner = Instance.new("UICorner")
     corner.Parent = StatusLabel
-    corner.CornerRadius = UDim.new(0, 8)
+    corner.CornerRadius = UDim.new(0, 10)
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Parent = StatusLabel
+    stroke.Color = Color3.fromRGB(0, 255, 127)
+    stroke.Thickness = 2
+    stroke.Transparency = 0.3
 end
 
--- Update GUI
-local function updateGUI()
+-- Update GUI status
+local function updateGUI(status)
     if StatusLabel then
-        StatusLabel.Text = "Auto Parry: " .. (AutoParry.Enabled and "ON" or "OFF") .. "\nPress F to toggle"
-        StatusLabel.TextColor3 = AutoParry.Enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 100, 100)
+        local statusText = status or "Waiting"
+        StatusLabel.Text = "🛡️ Auto Parry: " .. (AutoParry.Enabled and "ON" or "OFF") .. 
+                          "\n🎯 Status: " .. statusText .. 
+                          "\n⌨️ Press F to toggle"
+        
+        local stroke = StatusLabel:FindFirstChild("UIStroke")
+        if stroke then
+            stroke.Color = AutoParry.Enabled and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(255, 100, 100)
+        end
     end
 end
 
--- Enhanced ball detection
-local function findBalls()
-    local balls = {}
+-- Get the real ball from workspace
+local function GetBall()
+    if not Workspace:FindFirstChild("Balls") then return nil end
     
-    -- Check workspace for balls
-    for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name:lower():find("ball") and obj.Parent and obj.Velocity then
-            table.insert(balls, obj)
+    for _, Ball in ipairs(Workspace.Balls:GetChildren()) do
+        if Ball:GetAttribute("realBall") then
+            return Ball
         end
     end
-    
-    -- Also check for specific ball models or folders
-    local ballFolder = Workspace:FindFirstChild("Balls") or Workspace:FindFirstChild("Ball")
-    if ballFolder then
-        for _, obj in pairs(ballFolder:GetDescendants()) do
-            if obj:IsA("BasePart") and obj.Velocity then
-                table.insert(balls, obj)
-            end
-        end
-    end
-    
-    return balls
+    return nil
 end
 
--- Check if ball is dangerous (moving towards player)
-local function isBallDangerous(ball)
-    if not ball or not ball.Parent or not LocalPlayer.Character then return false end
-    
-    local character = LocalPlayer.Character
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return false end
-    
-    local ballPosition = ball.Position
-    local ballVelocity = ball.Velocity
-    local playerPosition = humanoidRootPart.Position
-    
-    -- Check if ball is moving fast enough
-    if ballVelocity.Magnitude < 10 then return false end
-    
-    -- Calculate distance
-    local distance = (ballPosition - playerPosition).Magnitude
-    
-    -- Check if ball is moving towards player
-    local directionToPlayer = (playerPosition - ballPosition).Unit
-    local ballDirection = ballVelocity.Unit
-    
-    local dotProduct = directionToPlayer:Dot(ballDirection)
-    
-    -- Ball is dangerous if it's close, moving fast, and towards player
-    return distance <= AutoParry.ParryDistance and dotProduct > 0.2
+-- Reset ball connection
+local function ResetConnection()
+    if Connection then
+        Connection:Disconnect()
+        Connection = nil
+    end
 end
 
 -- Perform parry action
 local function performParry()
-    local currentTime = tick()
-    if currentTime - LastParryTime < ParryDebounce then return end
+    if not AutoParry.Enabled then return end
     
-    LastParryTime = currentTime
+    -- Use VirtualInputManager for more reliable input
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
     
-    -- Try multiple parry methods
-    local success = false
+    IsParried = true
+    Cooldown = tick()
     
-    -- Method 1: Fire remote if found
-    if ParryRemote then
-        if ParryRemote:IsA("RemoteEvent") then
-            ParryRemote:FireServer()
-            success = true
-        elseif ParryRemote:IsA("RemoteFunction") then
-            pcall(function() ParryRemote:InvokeServer() end)
-            success = true
-        end
-    end
-    
-    -- Method 2: Simulate F key press
-    if not success then
-        local virtualInput = {
-            KeyCode = Enum.KeyCode.F,
-            UserInputType = Enum.UserInputType.Keyboard
-        }
-        UserInputService.InputBegan:Fire(virtualInput, false)
-    end
-    
-    -- Method 3: Simulate Space key press (backup)
-    local spaceInput = {
-        KeyCode = Enum.KeyCode.Space,
-        UserInputType = Enum.UserInputType.Keyboard
-    }
-    UserInputService.InputBegan:Fire(spaceInput, false)
+    updateGUI("🎯 PARRIED!")
     
     if AutoParry.DebugMode then
-        print("🛡️ Auto Parry: Attempted parry!")
+        print("🛡️ Auto Parry: Ball parried successfully!")
+    end
+    
+    -- Reset parry status after cooldown
+    task.spawn(function()
+        task.wait(1)
+        if (tick() - Cooldown) >= 1 then
+            IsParried = false
+            updateGUI("Waiting")
+        end
+    end)
+end
+
+-- Main parry detection loop
+local function parryLoop()
+    if not AutoParry.Enabled then return end
+    
+    local Ball = GetBall()
+    local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    
+    if not Ball or not HRP then
+        return
+    end
+    
+    -- Check if ball has zoomies (velocity component)
+    local zoomies = Ball:FindFirstChild("zoomies")
+    if not zoomies or not zoomies:FindFirstChild("VectorVelocity") then
+        return
+    end
+    
+    local Speed = zoomies.VectorVelocity.Magnitude
+    local Distance = (HRP.Position - Ball.Position).Magnitude
+    
+    -- Check if ball is targeting the player and conditions are met
+    if Ball:GetAttribute("target") == LocalPlayer.Name and 
+       not IsParried and 
+       Speed > 0 and
+       Distance / Speed <= AutoParry.ParryThreshold then
+        
+        performParry()
+        updateGUI("🎯 Ball Incoming!")
     end
 end
 
--- Main parry loop
-local function parryLoop()
-    if not AutoParry.Enabled or not LocalPlayer.Character then return end
+-- Handle new balls being added
+local function onBallAdded()
+    local Ball = GetBall()
+    if not Ball then return end
     
-    local balls = findBalls()
-    
-    for _, ball in pairs(balls) do
-        if isBallDangerous(ball) then
-            performParry()
-            if AutoParry.DebugMode then
-                print("🎾 Ball detected at distance:", (ball.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude)
-            end
-            break -- Only parry once per frame
-        end
-    end
+    ResetConnection()
+    Connection = Ball:GetAttributeChangedSignal("target"):Connect(function()
+        IsParried = false
+        updateGUI("New Target")
+    end)
 end
 
 -- Toggle auto parry
@@ -206,10 +188,11 @@ local function toggleAutoParry()
     AutoParry.Enabled = not AutoParry.Enabled
     updateGUI()
     
-    if AutoParry.Enabled then
-        print("🛡️ Auto Parry: Enabled")
-    else
-        print("🛡️ Auto Parry: Disabled")
+    local status = AutoParry.Enabled and "Enabled" or "Disabled"
+    sendNotification("Auto Parry", "Auto Parry " .. status, 3)
+    
+    if AutoParry.DebugMode then
+        print("🛡️ Auto Parry:", status)
     end
 end
 
@@ -222,31 +205,35 @@ local function onKeyPress(key, processed)
     end
 end
 
--- Initialize
+-- Initialize the script
 local function initialize()
-    print("🛡️ Initializing Blade Ball Auto Parry...")
+    print("🛡️ Initializing Enhanced Blade Ball Auto Parry...")
     
-    -- Find parry remote
-    ParryRemote = findParryRemote()
-    if ParryRemote then
-        print("🛡️ Found parry remote:", ParryRemote.Name, "in", ParryRemote.Parent.Name)
-    else
-        print("🛡️ No parry remote found, using key simulation")
-    end
+    -- Send startup notification
+    sendNotification(
+        "Glitched Nordic Void",
+        "Auto Parry Executed (Enhanced with visualizer)",
+        7
+    )
     
     -- Create GUI
     createGUI()
     updateGUI()
     
+    -- Set up ball detection
+    if Workspace:FindFirstChild("Balls") then
+        Connections.BallAdded = Workspace.Balls.ChildAdded:Connect(onBallAdded)
+        onBallAdded() -- Check for existing balls
+    end
+    
     -- Set up input detection
     Connections.KeyPress = UserInputService.InputBegan:Connect(onKeyPress)
     
     -- Set up main parry loop
-    Connections.ParryLoop = RunService.Heartbeat:Connect(parryLoop)
+    Connections.ParryLoop = RunService.PreSimulation:Connect(parryLoop)
     
-    print("🛡️ Auto Parry initialized successfully!")
-    print("🛡️ Press F to toggle auto parry")
-    print("🛡️ Parry distance:", AutoParry.ParryDistance)
+    print("🛡️ Enhanced Auto Parry initialized successfully!")
+    print("🛡️ Press F to toggle | Parry threshold:", AutoParry.ParryThreshold)
 end
 
 -- Cleanup function
@@ -254,6 +241,8 @@ local function cleanup()
     for _, connection in pairs(Connections) do
         if connection then connection:Disconnect() end
     end
+    
+    ResetConnection()
     
     if ScreenGui then
         ScreenGui:Destroy()
@@ -278,4 +267,4 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
-print("🛡️ Blade Ball Auto Parry loaded successfully!")
+print("🛡️ Enhanced Blade Ball Auto Parry loaded successfully!")
